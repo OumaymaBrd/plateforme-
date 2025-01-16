@@ -131,10 +131,9 @@ class Admin {
     }
 
     public function getTopTeachers() {
-        $query = "SELECT u.nom, u.prenom, COUNT(DISTINCT ic.titre_cours) as count
+        $query = "SELECT u.nom, u.prenom, COUNT(*) as count
                   FROM user_ u
-                  LEFT JOIN inscris_cours ic ON u.matricule = ic.matricule_enseignant
-                  WHERE u.post = 'enseignant'
+                  JOIN inscris_cours ic ON u.matricule = ic.matricule_enseignant
                   GROUP BY u.matricule
                   ORDER BY count DESC
                   LIMIT 3";
@@ -207,5 +206,7 @@ class Admin {
         error_log("Error in Admin class: " . $e->getMessage());
         // You can add more sophisticated error handling here, such as sending notifications
     }
+
+    
 }
 

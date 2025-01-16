@@ -24,6 +24,7 @@ $totalCourses = $admin->getTotalCourses();
 $coursesByCategory = $admin->getCoursesByCategory();
 $topCourses = $admin->getTopCourses();
 $topTeachers = $admin->getTopTeachers();
+
 ?>
 
 <!DOCTYPE html>
@@ -36,15 +37,12 @@ $topTeachers = $admin->getTopTeachers();
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         :root {
-            --primary-color: #4a90e2;
-            --secondary-color: #f5a623;
-            --accent-color: #50e3c2;
-            --background-color: #f8f9fa;
-            --text-color: #333;
-            --light-color: #ffffff;
-            --dark-color: #2c3e50;
-            --success-color: #5cb85c;
-            --danger-color: #d9534f;
+            --primary-color: #1a1a2e;
+            --secondary-color: #16213e;
+            --accent-color: #0f3460;
+            --text-color: #e94560;
+            --light-color: #f1f1f1;
+            --dark-color: #121212;
         }
         * {
             margin: 0;
@@ -53,8 +51,8 @@ $topTeachers = $admin->getTopTeachers();
         }
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
+            background-color: var(--light-color);
+            color: var(--dark-color);
             line-height: 1.6;
         }
         .container {
@@ -63,19 +61,17 @@ $topTeachers = $admin->getTopTeachers();
         }
         .sidebar {
             width: 250px;
-            background-color: var(--dark-color);
+            background-color: var(--primary-color);
             color: var(--light-color);
             padding: 20px;
             position: fixed;
             height: 100vh;
             overflow-y: auto;
-            transition: all 0.3s ease;
         }
         .main-content {
             flex: 1;
             padding: 20px;
             margin-left: 250px;
-            transition: all 0.3s ease;
         }
         h1, h2, h3 {
             color: var(--primary-color);
@@ -84,21 +80,17 @@ $topTeachers = $admin->getTopTeachers();
         .sidebar h2 {
             color: var(--light-color);
             margin-bottom: 20px;
-            font-size: 24px;
-            text-align: center;
         }
         .menu-item {
-            padding: 10px 15px;
+            padding: 10px 0;
             cursor: pointer;
             transition: all 0.3s ease;
-            border-radius: 5px;
-            margin-bottom: 5px;
         }
         .menu-item:hover {
-            background-color: var(--primary-color);
+            background-color: var(--secondary-color);
         }
         .menu-item.active {
-            background-color: var(--primary-color);
+            background-color: var(--accent-color);
         }
         .sub-menu {
             padding-left: 20px;
@@ -108,15 +100,11 @@ $topTeachers = $admin->getTopTeachers();
             display: block;
         }
         .card {
-            background-color: var(--light-color);
+            background-color: white;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             padding: 20px;
             margin-bottom: 20px;
-            transition: all 0.3s ease;
-        }
-        .card:hover {
-            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
         }
         table {
             width: 100%;
@@ -132,12 +120,12 @@ $topTeachers = $admin->getTopTeachers();
             color: var(--light-color);
         }
         tr:hover {
-            background-color: rgba(74, 144, 226, 0.1);
+            background-color: #f5f5f5;
         }
         .btn {
             display: inline-block;
             padding: 10px 20px;
-            background-color: var(--primary-color);
+            background-color: var(--accent-color);
             color: var(--light-color);
             text-decoration: none;
             border-radius: 5px;
@@ -154,7 +142,7 @@ $topTeachers = $admin->getTopTeachers();
         label {
             display: block;
             margin-bottom: 5px;
-            color: var(--text-color);
+            color: var(--primary-color);
         }
         input[type="text"], textarea, select {
             width: 100%;
@@ -162,11 +150,6 @@ $topTeachers = $admin->getTopTeachers();
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
-            transition: border-color 0.3s ease;
-        }
-        input[type="text"]:focus, textarea:focus, select:focus {
-            border-color: var(--primary-color);
-            outline: none;
         }
         #message {
             position: fixed;
@@ -175,24 +158,22 @@ $topTeachers = $admin->getTopTeachers();
             transform: translateX(-50%);
             padding: 10px 20px;
             border-radius: 5px;
-            color: var(--light-color);
+            color: white;
             font-weight: bold;
             z-index: 1000;
             display: none;
-            animation: fadeInOut 4s ease-in-out;
         }
         #message.success {
-            background-color: var(--success-color);
+            background-color: #4CAF50;
         }
         #message.error {
-            background-color: var(--danger-color);
+            background-color: #f44336;
         }
         .tab-content {
             display: none;
         }
         .tab-content.active {
             display: block;
-            animation: fadeIn 0.5s ease-in-out;
         }
         .chart-container {
             display: flex;
@@ -200,34 +181,17 @@ $topTeachers = $admin->getTopTeachers();
             justify-content: space-around;
         }
         .chart {
-            width: 100%;
+            width: 45%;
             margin-bottom: 20px;
-            background-color: var(--light-color);
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 20px;
         }
-        @media (min-width: 768px) {
-            .chart {
-                width: 48%;
-            }
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes fadeInOut {
-            0% { opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { opacity: 0; }
-        }
+
+        
     </style>
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
-            <h2>Youdemy Admin</h2>
+            <h2>Dashboard Admin</h2>
             <div class="menu-item" onclick="openTab('enseignants')">Gestion des enseignants</div>
             <div class="menu-item" onclick="toggleSubMenu('content-management')">Gestion du contenu</div>
             <div class="sub-menu" id="content-management-sub">
@@ -540,34 +504,101 @@ $topTeachers = $admin->getTopTeachers();
             drawTopTeachersChart();
         }
 
-        function drawCoursesByCategoryChart() {
-            var data = google.visualization.arrayToDataTable([
-                ['Catégorie', 'Nombre de cours'],
-                <?php
-                foreach ($coursesByCategory as $category) {
-                    echo "['" . addslashes($category['categorie']) . "', " . $category['count'] . "],";
-                }
-                ?>
-            ]);
+       
+        google.charts.load('current', {'packages':['corechart']});
+google.charts.setOnLoadCallback(drawCharts);
 
-            var options = {
-                title: 'Répartition des cours par catégorie',
-                pieHole: 0.4,
-                colors: ['#4a90e2', '#50e3c2', '#f5a623', '#d0021b', '#9013fe'],
-                chartArea: {width: '100%', height: '80%'},
-                legend: {position: 'bottom'}
-            };
+function drawCharts() {
+    drawCoursesByCategoryChart();
+    drawTopCoursesChart();
+    drawTopTeachersChart();
+}
 
-            var chart = new google.visualization.PieChart(document.getElementById('coursesByCategoryChart'));
-            chart.draw(data, options);
+function drawCoursesByCategoryChart() {
+    var data = google.visualization.arrayToDataTable([
+        ['Catégorie', 'Nombre de cours'],
+        <?php
+        foreach ($coursesByCategory as $category) {
+            echo "['" . addslashes($category['categorie']) . "', " . $category['count'] . "],";
         }
+        ?>
+    ]);
 
+    var options = {
+        title: 'Répartition des cours par catégorie',
+        is3D: true,
+        width: '100%',
+        height: 500,
+        backgroundColor: 'transparent',
+        colors: ['#4285F4', '#DB4437', '#F4B400', '#0F9D58', '#AB47BC', '#00ACC1', '#FF7043'],
+        legend: { position: 'right', textStyle: { fontSize: 14 } },
+        titleTextStyle: { fontSize: 18, bold: true },
+        pieSliceTextStyle: { fontSize: 14 },
+        sliceVisibilityThreshold: 0.05
+    };
+
+    var chart = new google.visualization.PieChart(document.getElementById('coursesByCategoryChart'));
+    chart.draw(data, options);
+}
+
+function drawTopCoursesChart() {
+    var data = google.visualization.arrayToDataTable([
+        ['Cours', 'Nombre d\'étudiants'],
+        <?php
+        foreach ($topCourses as $course) {
+            echo "['" . addslashes($course['titre_cours']) . "', " . $course['count'] . "],";
+        }
+        ?>
+    ]);
+
+    var options = {
+        title: 'Top 3 des cours les plus populaires',
+        is3D: true,
+        width: '100%',
+        height: 400,
+        backgroundColor: 'transparent',
+        colors: ['#4285F4', '#DB4437', '#F4B400'],
+        legend: { position: 'right', textStyle: { fontSize: 14 } },
+        titleTextStyle: { fontSize: 18, bold: true },
+        pieSliceTextStyle: { fontSize: 14 }
+    };
+
+    var chart = new google.visualization.PieChart(document.getElementById('topCoursesChart'));
+    chart.draw(data, options);
+}
+
+function drawTopTeachersChart() {
+    var data = google.visualization.arrayToDataTable([
+        ['Enseignant', 'Nombre d\'étudiants'],
+        <?php
+        foreach ($topTeachers as $teacher) {
+            echo "['" . addslashes($teacher['nom'] . ' ' . $teacher['prenom']) . "', " . $teacher['count'] . "],";
+        }
+        ?>
+    ]);
+
+    var options = {
+        title: 'Top 3 des enseignants',
+        is3D: true,
+        width: '100%',
+        height: 400,
+        backgroundColor: 'transparent',
+        colors: ['#0F9D58', '#AB47BC', '#00ACC1'],
+        legend: { position: 'right', textStyle: { fontSize: 14 } },
+        titleTextStyle: { fontSize: 18, bold: true },
+        pieSliceTextStyle: { fontSize: 14 }
+    };
+
+    var chart = new google.visualization.PieChart(document.getElementById('topTeachersChart'));
+    chart.draw(data, options);
+}
+        
         function drawTopCoursesChart() {
             var data = google.visualization.arrayToDataTable([
                 ['Cours', 'Nombre d\'étudiants'],
                 <?php
                 foreach ($topCourses as $course) {
-                    echo "['" . addslashes($course['titre_cours']) . "', " . $course['count'] . "],";
+                    echo "['" . $course['titre_cours'] . "', " . $course['count'] . "],";
                 }
                 ?>
             ]);
@@ -575,18 +606,9 @@ $topTeachers = $admin->getTopTeachers();
             var options = {
                 title: 'Top 3 des cours les plus populaires',
                 legend: { position: 'none' },
-                colors: ['#4a90e2'],
-                chartArea: {width: '80%', height: '70%'},
-                hAxis: {
-                    title: 'Nombre d\'étudiants',
-                    minValue: 0
-                },
-                vAxis: {
-                    title: 'Cours'
-                }
             };
 
-            var chart = new google.visualization.BarChart(document.getElementById('topCoursesChart'));
+            var chart = new google.visualization.ColumnChart(document.getElementById('topCoursesChart'));
             chart.draw(data, options);
         }
 
@@ -595,7 +617,7 @@ $topTeachers = $admin->getTopTeachers();
                 ['Enseignant', 'Nombre d\'étudiants'],
                 <?php
                 foreach ($topTeachers as $teacher) {
-                    echo "['" . addslashes($teacher['nom'] . ' ' . $teacher['prenom']) . "', " . $teacher['count'] . "],";
+                    echo "['" . $teacher['nom'] . ' ' . $teacher['prenom'] . "', " . $teacher['count'] . "],";
                 }
                 ?>
             ]);
@@ -603,20 +625,13 @@ $topTeachers = $admin->getTopTeachers();
             var options = {
                 title: 'Top 3 des enseignants',
                 legend: { position: 'none' },
-                colors: ['#50e3c2'],
-                chartArea: {width: '80%', height: '70%'},
-                hAxis: {
-                    title: 'Nombre d\'étudiants',
-                    minValue: 0
-                },
-                vAxis: {
-                    title: 'Enseignants'
-                }
             };
 
-            var chart = new google.visualization.BarChart(document.getElementById('topTeachersChart'));
+            var chart = new google.visualization.ColumnChart(document.getElementById('topTeachersChart'));
             chart.draw(data, options);
         }
+
+        
     </script>
 </body>
 </html>
