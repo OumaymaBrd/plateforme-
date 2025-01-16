@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../../db/Database.php';
-require_once '../../models/User.php';
+require_once '../../models/user.php';
 
 $database = new Database();
 $db = $database->getConnection();
@@ -23,30 +23,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
 
         $matricule_param = urlencode($_SESSION['user_matricule']);
 
-        if ($user->isAdmin()) {
-            header("Location: admin.php?matricule=$matricule_param");
-            exit();
-        } elseif ($user->status === 'accepter') {
-            switch ($user->post) {
-                case 'enseignant':
-                    header("Location: enseignat.php?matricule=$matricule_param");
-                    exit();
-                case 'etudiant':
-                    header("Location: etudiant.php?matricule=$matricule_param");
-                    exit();
-                default:
-                    header("Location: ../../home.php?matricule=$matricule_param");
-                    exit();
-            }
-        } elseif ($user->status === 'en Cours') {
-            header("Location: EnCoursTraitement.php?matricule=$matricule_param");
-            exit();
-        } elseif ($user->status === 'refuser') {
-            header("Location: 401.php?matricule=$matricule_param");
-            exit();
-        } else {
-            $error = "Statut de compte non reconnu.";
+        switch ($user->status) {
+            case 'en Cours':
+                header("Location: EnCoursTraitement.php?matricule=$matricule_param");
+                break;
+            case 'refuser':
+                header("Location: 401.php?matricule=$matricule_param");
+                break;
+            case 'accepter':
+                switch ($user->post) {
+                    case 'enseignant':
+                        header("Location: enseignat.php?matricule=$matricule_param");
+                        break;
+                    case 'etudiant':
+                        header("Location: etudiant.php?matricule=$matricule_param");
+                        break;
+                    case 'admin':
+                        header("Location: admin.php?matricule=$matricule_param");
+                        break;
+                    default:
+                        header("Location: ../../index.php?matricule=$matricule_param");
+                        break;
+                }
+                break;
+            default:
+                $error = "Statut de compte non reconnu.";
+                break;
         }
+        exit();
     } else {
         $error = $user->error_message;
     }
@@ -68,21 +72,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
             margin-bottom: 15px;
             text-align: center;
         }
-        .home-link {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #fff;
-            text-decoration: none;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
     <section class="container">
         <div class="login-container">
             <div class="circle circle-one"></div>
-            <a href="../../home.php" class="home-link">Accueil</a>
             <div class="form-container">
                 <img src="https://raw.githubusercontent.com/hicodersofficial/glassmorphism-login-form/master/assets/illustration.png" alt="illustration" class="illustration" />
                 <h1 class="opacity">Login</h1>
@@ -97,8 +92,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                     <button type="submit" name="login" class="opacity">Se connecter</button>
                 </form>
                 <div class="register-forget opacity">
-                    <a href="../../index.php">S'inscrire</a>
-                    <a href="#">Mot de passe oublié?</a>
+                    <a href=""></a>
+                    <a href=""></a>
                 </div>
             </div>
             <div class="circle circle-two"></div>
