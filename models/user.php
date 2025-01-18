@@ -20,7 +20,6 @@ class User {
     }
 
     public function register() {
-        // Générer le matricule avant l'insertion
         $this->matricule = $this->generateMatricule();
 
         $query = "INSERT INTO " . $this->table_name . " 
@@ -78,7 +77,6 @@ class User {
         $randomNumber = str_pad(mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
         $matricule = $prefix . $randomNumber;
 
-        // Vérifier si le matricule existe déjà
         while ($this->matriculeExists($matricule)) {
             $randomNumber = str_pad(mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
             $matricule = $prefix . $randomNumber;
@@ -127,18 +125,14 @@ class User {
         return $this->post === 'admin';
     }
 
-    public function getAllCourses() {
-        $query = "SELECT c.*, u.nom as nom_enseignant, u.prenom as prenom_enseignant 
-                  FROM cours c 
-                  JOIN user_ u ON c.matricule_enseignant = u.matricule 
-                  WHERE c.supprime = 0 
-                  ORDER BY c.date_creation DESC";
+    public function getAllCategories() {
+        $query = "SELECT DISTINCT categorie FROM cours WHERE supprime = 0 ORDER BY categorie";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    public function filterCourses($category = null, $search = null) {
+    public function getCoursesWithPagination($category = null, $search = null, $page = 1, $coursesPerPage = 3) {
         $query = "SELECT c.*, u.nom as nom_enseignant, u.prenom as prenom_enseignant 
                   FROM cours c 
                   JOIN user_ u ON c.matricule_enseignant = u.matricule 
@@ -152,14 +146,40 @@ class User {
             $query .= " AND (c.titre LIKE :search OR c.description LIKE :search)";
         }
         
-        $query .= " ORDER BY c.date_creation DESC";
+        $query .= " ORDER BY c.date_creation DESC LIMIT :offset, :limit";
         
         $stmt = $this->conn->prepare($query);
-        // 
+        
+        if ($category) {
+            $stmt->bindParam(':category', $category);
+        }
+        
+        if ($search) {
+            $search = "%{$search}%";
+            $stmt->bindParam(':search', $search);
+        }
+        
+        $offset = ($page - 1) * $coursesPerPage;
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->bindParam(':limit', $coursesPerPage, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-
-        // test
-        // 
+    public function getTotalCourses($category = null, $search = null) {
+        $query = "SELECT COUNT(*) as total FROM cours c WHERE c.supprime = 0";
+        
+        if ($category) {
+            $query .= " AND c.categorie = :category";
+        }
+        
+        if ($search) {
+            $query .= " AND (c.titre LIKE :search OR c.description LIKE :search)";
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        
         if ($category) {
             $stmt->bindParam(':category', $category);
         }
@@ -170,27 +190,21 @@ class User {
         }
         
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['total'];
     }
 
-    public function getAllCategories() {
-        $query = "SELECT DISTINCT categorie FROM cours WHERE supprime = 0 ORDER BY categorie";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_COLUMN);
-    }
-
-    public function getCourseDetails($courseId) {
+    public function getCourseDetails($id) {
         $query = "SELECT c.*, u.nom as nom_enseignant, u.prenom as prenom_enseignant 
                   FROM cours c 
                   JOIN user_ u ON c.matricule_enseignant = u.matricule 
                   WHERE c.id = :id AND c.supprime = 0";
         
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $courseId, PDO::PARAM_INT);
+        $stmt->bindParam(':id', $id);
         $stmt->execute();
         
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }
-
+?>
