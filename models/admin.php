@@ -110,6 +110,8 @@ class Admin {
         return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     }
 
+    
+
     public function getCoursesByCategory() {
         $query = "SELECT categorie, COUNT(*) as count FROM cours WHERE supprime = 0 GROUP BY categorie";
         $stmt = $this->conn->prepare($query);
@@ -206,6 +208,186 @@ class Admin {
         error_log("Error in Admin class: " . $e->getMessage());
         // You can add more sophisticated error handling here, such as sending notifications
     }
+
+   
+    public function getEtudiants() {
+        $query = "SELECT * FROM user_ WHERE post='etudiant' ORDER BY 
+                  CASE 
+                      WHEN status = 'accepter' THEN 1
+                      WHEN status = 'refuser' THEN 2
+                      WHEN status = 'en Cours' THEN 3
+                      
+                  END";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function updateUserStatus($matricule, $status, $userType) {
+        $query = "UPDATE user_ SET status = :status WHERE matricule = :matricule AND post = :userType";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':status', $status);
+        $stmt->bindParam(':matricule', $matricule);
+        $stmt->bindParam(':userType', $userType);
+        return $stmt->execute();
+    }
+
+    public function getEnseignantsPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM user_ WHERE post='enseignant' LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getEtudiantsPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM user_ WHERE post='etudiant' LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function fetchEnseignantsPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM user_ WHERE post='enseignant' ORDER BY 
+                  CASE 
+                      WHEN status = 'en Cours' THEN 1
+                      WHEN status = 'accepter' THEN 2
+                      WHEN status = 'refuser' THEN 3
+                  END
+                  LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function fetchEtudiantsPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM user_ WHERE post='etudiant' ORDER BY 
+                  CASE 
+                      WHEN status = 'accepter' THEN 1
+                      WHEN status = 'refuser' THEN 2
+                      WHEN status = 'en Cours' THEN 3
+                  END
+                  LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getCoursPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM cours WHERE supprime = 0 LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function fetchCoursPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT c.*, u.nom as nom_enseignant, u.prenom as prenom_enseignant 
+                  FROM cours c 
+                  JOIN user_ u ON c.matricule_enseignant = u.matricule 
+                  WHERE c.supprime = 0
+                  LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getCategoriesPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM categorie WHERE supprime = 0 LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function fetchCategoriesPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM categorie WHERE supprime = 0 LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getTagsPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM tags LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function fetchTagsPaginated($page = 1, $itemsPerPage = 7) {
+        $offset = ($page - 1) * $itemsPerPage;
+        $query = "SELECT * FROM tags LIMIT :limit OFFSET :offset";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $itemsPerPage, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getTotalEnseignants() {
+        $query = "SELECT COUNT(*) as total FROM user_ WHERE post='enseignant'";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+
+    public function getTotalEtudiants() {
+        $query = "SELECT COUNT(*) as total FROM user_ WHERE post='etudiant'";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+    public function getTotalCours() {
+        $query = "SELECT COUNT(*) as total FROM cours WHERE supprime = 0";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+
+    public function getTotalCategories() {
+        $query = "SELECT COUNT(*) as total FROM categorie WHERE supprime = 0";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+
+    public function getTotalTags() {
+        $query = "SELECT COUNT(*) as total FROM tags";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+    public function getTotalActiveCourses() {
+        $query = "SELECT COUNT(*) as total FROM cours WHERE supprime = 0";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+    
 
     
 }

@@ -15,6 +15,7 @@ $db = $database->getConnection();
 $admin = new Admin($db);
 
 $enseignants = $admin->getEnseignants();
+$etudiants = $admin->getEtudiants();
 $cours = $admin->getCours();
 $categories = $admin->getCategories();
 $tags = $admin->getTags();
@@ -24,7 +25,6 @@ $totalCourses = $admin->getTotalCourses();
 $coursesByCategory = $admin->getCoursesByCategory();
 $topCourses = $admin->getTopCourses();
 $topTeachers = $admin->getTopTeachers();
-
 ?>
 
 <!DOCTYPE html>
@@ -34,14 +34,18 @@ $topTeachers = $admin->getTopTeachers();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin - Youdemy</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link href="../style/style_admin.css" rel="stylesheet">
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <link href="../style/style_admin.css" rel="stylesheet">
+    <style>
+        /* Ajoutez ici vos styles CSS personnalisés si nécessaire */
+    </style>
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
-            <h2>Dashboard Admin</h2>
+            <h2>Youdemy Admin</h2>
             <div class="menu-item" onclick="openTab('enseignants')">Gestion des enseignants</div>
+            <div class="menu-item" onclick="openTab('etudiants')">Gestion des étudiants</div>
             <div class="menu-item" onclick="toggleSubMenu('content-management')">Gestion du contenu</div>
             <div class="sub-menu" id="content-management-sub">
                 <div class="menu-item" onclick="openTab('cours')">Visualiser les cours</div>
@@ -69,16 +73,50 @@ $topTeachers = $admin->getTopTeachers();
                         </thead>
                         <tbody>
                             <?php foreach ($enseignants as $enseignant): ?>
-                                <tr>
+                                <tr data-matricule="<?php echo htmlspecialchars($enseignant['matricule']); ?>">
                                     <td><?php echo htmlspecialchars($enseignant['matricule']); ?></td>
                                     <td><?php echo htmlspecialchars($enseignant['nom']); ?></td>
                                     <td><?php echo htmlspecialchars($enseignant['prenom']); ?></td>
                                     <td><?php echo htmlspecialchars($enseignant['status']); ?></td>
                                     <td>
-                                        <select onchange="updateEnseignantStatus('<?php echo $enseignant['matricule']; ?>', this.value)">
+                                        <select onchange="updateUserStatus('<?php echo $enseignant['matricule']; ?>', this.value, 'enseignant')">
                                             <option value="en Cours" <?php echo $enseignant['status'] == 'en Cours' ? 'selected' : ''; ?>>En cours</option>
                                             <option value="accepter" <?php echo $enseignant['status'] == 'accepter' ? 'selected' : ''; ?>>Accepter</option>
                                             <option value="refuser" <?php echo $enseignant['status'] == 'refuser' ? 'selected' : ''; ?>>Refuser</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="etudiants" class="tab-content">
+                <div class="card">
+                    <h2>Gestion des étudiants</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Prénom</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($etudiants as $etudiant): ?>
+                                <tr data-matricule="<?php echo htmlspecialchars($etudiant['matricule']); ?>">
+                                    <td><?php echo htmlspecialchars($etudiant['matricule']); ?></td>
+                                    <td><?php echo htmlspecialchars($etudiant['nom']); ?></td>
+                                    <td><?php echo htmlspecialchars($etudiant['prenom']); ?></td>
+                                    <td><?php echo htmlspecialchars($etudiant['status']); ?></td>
+                                    <td>
+                                        <select onchange="updateUserStatus('<?php echo $etudiant['matricule']; ?>', this.value, 'etudiant')">
+                                            <option value="accepter" <?php echo $etudiant['status'] == 'accepter' ? 'selected' : ''; ?>>Accepter</option>
+                                            <option value="refuser" <?php echo $etudiant['status'] == 'refuser' ? 'selected' : ''; ?>>Refuser</option>
+                                            <option value="en Cours" <?php echo $etudiant['status'] == 'en Cours' ? 'selected' : ''; ?>>En Cours</option>
                                         </select>
                                     </td>
                                 </tr>
@@ -105,7 +143,7 @@ $topTeachers = $admin->getTopTeachers();
                         </thead>
                         <tbody>
                             <?php foreach ($cours as $course): ?>
-                                <tr>
+                                <tr data-course-id="<?php echo $course['id']; ?>">
                                     <td><?php echo htmlspecialchars($course['titre']); ?></td>
                                     <td><?php echo htmlspecialchars($course['description']); ?></td>
                                     <td><?php echo htmlspecialchars($course['type']); ?></td>
@@ -145,7 +183,7 @@ $topTeachers = $admin->getTopTeachers();
                         </thead>
                         <tbody>
                             <?php foreach ($categories as $categorie): ?>
-                                <tr>
+                                <tr data-category-id="<?php echo $categorie['id']; ?>">
                                     <td><?php echo htmlspecialchars($categorie['nom_categorie']); ?></td>
                                     <td><?php echo htmlspecialchars($categorie['description']); ?></td>
                                     <td>
@@ -165,10 +203,10 @@ $topTeachers = $admin->getTopTeachers();
                     <form id="tagForm">
                         <input type="hidden" id="tag_id" name="id">
                         <div class="form-group">
-                            <label for="nom_tag">Nom du tag:</label>
+                            <label for="nom_tag">Nom du tag (pour ajouter plusieurs tags, séparez-les par des virgules):</label>
                             <input type="text" id="nom_tag" name="nom_tag" required>
                         </div>
-                        <button type="submit" class="btn">Ajouter/Modifier le tag</button>
+                        <button type="submit" class="btn">Ajouter/Modifier le(s) tag(s)</button>
                     </form>
                     <table>
                         <thead>
@@ -180,7 +218,7 @@ $topTeachers = $admin->getTopTeachers();
                         </thead>
                         <tbody>
                             <?php foreach ($tags as $tag): ?>
-                                <tr>
+                                <tr data-tag-id="<?php echo $tag['id']; ?>">
                                     <td><?php echo htmlspecialchars($tag['nom_tag']); ?></td>
                                     <td><?php echo htmlspecialchars($tag['date_creation']); ?></td>
                                     <td>
@@ -197,6 +235,7 @@ $topTeachers = $admin->getTopTeachers();
             <div id="statistics" class="tab-content">
                 <div class="card">
                     <h2>Statistiques</h2>
+                    <p>Nombre Total de cours : <?php echo $totalCourses; ?></p>
                     <div class="chart-container">
                         <div class="chart" id="coursesByCategoryChart"></div>
                         <div class="chart" id="topCoursesChart"></div>
@@ -226,19 +265,20 @@ $topTeachers = $admin->getTopTeachers();
             messageElement.show();
             setTimeout(function() {
                 messageElement.hide();
-            }, 3000);
+            }, 3000); // 4 minutes
         }
 
-        function updateEnseignantStatus(matricule, status) {
+        function updateUserStatus(matricule, status, userType) {
             $.ajax({
-                url: 'update_ens_admin.php',
+                url: 'update_user_status.php',
                 type: 'POST',
-                data: { matricule: matricule, status: status },
+                data: { matricule: matricule, status: status, userType: userType },
                 success: function(response) {
                     var result = JSON.parse(response);
                     showMessage(result.message, result.success);
                     if (result.success) {
-                        location.reload();
+                        // Update the status in the table without reloading
+                        $('tr[data-matricule="' + matricule + '"] td:nth-child(4)').text(status);
                     }
                 }
             });
@@ -254,7 +294,8 @@ $topTeachers = $admin->getTopTeachers();
                         var result = JSON.parse(response);
                         showMessage(result.message, result.success);
                         if (result.success) {
-                            location.reload();
+                            // Remove the course row from the table without reloading
+                            $('tr[data-course-id="' + id + '"]').remove();
                         }
                     }
                 });
@@ -274,7 +315,8 @@ $topTeachers = $admin->getTopTeachers();
                     if (result.success) {
                         $('#categorieForm')[0].reset();
                         $('#categorie_id').val('');
-                        location.reload();
+                        // Refresh the categories table without reloading
+                        refreshCategoriesTable();
                     }
                 }
             });
@@ -296,7 +338,8 @@ $topTeachers = $admin->getTopTeachers();
                         var result = JSON.parse(response);
                         showMessage(result.message, result.success);
                         if (result.success) {
-                            location.reload();
+                            // Remove the category row from the table without reloading
+                            $('tr[data-category-id="' + id + '"]').remove();
                         }
                     }
                 });
@@ -316,7 +359,8 @@ $topTeachers = $admin->getTopTeachers();
                     if (result.success) {
                         $('#tagForm')[0].reset();
                         $('#tag_id').val('');
-                        location.reload();
+                        // Refresh the tags table without reloading
+                        refreshTagsTable();
                     }
                 }
             });
@@ -337,11 +381,33 @@ $topTeachers = $admin->getTopTeachers();
                         var result = JSON.parse(response);
                         showMessage(result.message, result.success);
                         if (result.success) {
-                            location.reload();
+                            // Remove the tag row from the table without reloading
+                            $('tr[data-tag-id="' + id + '"]').remove();
                         }
                     }
                 });
             }
+        }
+
+        // Helper functions to refresh tables
+        function refreshCategoriesTable() {
+            $.ajax({
+                url: 'get_categories.php',
+                type: 'GET',
+                success: function(response) {
+                    $('#categories table tbody').html(response);
+                }
+            });
+        }
+
+        function refreshTagsTable() {
+            $.ajax({
+                url: 'get_tags.php',
+                type: 'GET',
+                success: function(response) {
+                    $('#tags table tbody').html(response);
+                }
+            });
         }
 
         google.charts.load('current', {'packages':['corechart']});
@@ -353,101 +419,34 @@ $topTeachers = $admin->getTopTeachers();
             drawTopTeachersChart();
         }
 
-       
-        google.charts.load('current', {'packages':['corechart']});
-google.charts.setOnLoadCallback(drawCharts);
+        function drawCoursesByCategoryChart() {
+            var data = google.visualization.arrayToDataTable([
+                ['Catégorie', 'Nombre de cours'],
+                <?php
+                foreach ($coursesByCategory as $category) {
+                    echo "['" . addslashes($category['categorie']) . "', " . $category['count'] . "],";
+                }
+                ?>
+            ]);
 
-function drawCharts() {
-    drawCoursesByCategoryChart();
-    drawTopCoursesChart();
-    drawTopTeachersChart();
-}
+            var options = {
+                title: 'Répartition des cours par catégorie',
+                pieHole: 0.4,
+                colors: ['#4a90e2', '#50e3c2', '#f5a623', '#d0021b', '#9013fe'],
+                chartArea: {width: '100%', height: '80%'},
+                legend: {position: 'bottom'}
+            };
 
-function drawCoursesByCategoryChart() {
-    var data = google.visualization.arrayToDataTable([
-        ['Catégorie', 'Nombre de cours'],
-        <?php
-        foreach ($coursesByCategory as $category) {
-            echo "['" . addslashes($category['categorie']) . "', " . $category['count'] . "],";
+            var chart = new google.visualization.PieChart(document.getElementById('coursesByCategoryChart'));
+            chart.draw(data, options);
         }
-        ?>
-    ]);
 
-    var options = {
-        title: 'Répartition des cours par catégorie',
-        is3D: true,
-        width: '100%',
-        height: 500,
-        backgroundColor: 'transparent',
-        colors: ['#4285F4', '#DB4437', '#F4B400', '#0F9D58', '#AB47BC', '#00ACC1', '#FF7043'],
-        legend: { position: 'right', textStyle: { fontSize: 14 } },
-        titleTextStyle: { fontSize: 18, bold: true },
-        pieSliceTextStyle: { fontSize: 14 },
-        sliceVisibilityThreshold: 0.05
-    };
-
-    var chart = new google.visualization.PieChart(document.getElementById('coursesByCategoryChart'));
-    chart.draw(data, options);
-}
-
-function drawTopCoursesChart() {
-    var data = google.visualization.arrayToDataTable([
-        ['Cours', 'Nombre d\'étudiants'],
-        <?php
-        foreach ($topCourses as $course) {
-            echo "['" . addslashes($course['titre_cours']) . "', " . $course['count'] . "],";
-        }
-        ?>
-    ]);
-
-    var options = {
-        title: 'Top 3 des cours les plus populaires',
-        is3D: true,
-        width: '100%',
-        height: 400,
-        backgroundColor: 'transparent',
-        colors: ['#4285F4', '#DB4437', '#F4B400'],
-        legend: { position: 'right', textStyle: { fontSize: 14 } },
-        titleTextStyle: { fontSize: 18, bold: true },
-        pieSliceTextStyle: { fontSize: 14 }
-    };
-
-    var chart = new google.visualization.PieChart(document.getElementById('topCoursesChart'));
-    chart.draw(data, options);
-}
-
-function drawTopTeachersChart() {
-    var data = google.visualization.arrayToDataTable([
-        ['Enseignant', 'Nombre d\'étudiants'],
-        <?php
-        foreach ($topTeachers as $teacher) {
-            echo "['" . addslashes($teacher['nom'] . ' ' . $teacher['prenom']) . "', " . $teacher['count'] . "],";
-        }
-        ?>
-    ]);
-
-    var options = {
-        title: 'Top 3 des enseignants',
-        is3D: true,
-        width: '100%',
-        height: 400,
-        backgroundColor: 'transparent',
-        colors: ['#0F9D58', '#AB47BC', '#00ACC1'],
-        legend: { position: 'right', textStyle: { fontSize: 14 } },
-        titleTextStyle: { fontSize: 18, bold: true },
-        pieSliceTextStyle: { fontSize: 14 }
-    };
-
-    var chart = new google.visualization.PieChart(document.getElementById('topTeachersChart'));
-    chart.draw(data, options);
-}
-        
         function drawTopCoursesChart() {
             var data = google.visualization.arrayToDataTable([
                 ['Cours', 'Nombre d\'étudiants'],
                 <?php
                 foreach ($topCourses as $course) {
-                    echo "['" . $course['titre_cours'] . "', " . $course['count'] . "],";
+                    echo "['" . addslashes($course['titre_cours']) . "', " . $course['count'] . "],";
                 }
                 ?>
             ]);
@@ -455,9 +454,18 @@ function drawTopTeachersChart() {
             var options = {
                 title: 'Top 3 des cours les plus populaires',
                 legend: { position: 'none' },
+                colors: ['#4a90e2'],
+                chartArea: {width: '80%', height: '70%'},
+                hAxis: {
+                    title: 'Nombre d\'étudiants',
+                    minValue: 0
+                },
+                vAxis: {
+                    title: 'Cours'
+                }
             };
 
-            var chart = new google.visualization.ColumnChart(document.getElementById('topCoursesChart'));
+            var chart = new google.visualization.BarChart(document.getElementById('topCoursesChart'));
             chart.draw(data, options);
         }
 
@@ -466,7 +474,7 @@ function drawTopTeachersChart() {
                 ['Enseignant', 'Nombre d\'étudiants'],
                 <?php
                 foreach ($topTeachers as $teacher) {
-                    echo "['" . $teacher['nom'] . ' ' . $teacher['prenom'] . "', " . $teacher['count'] . "],";
+                    echo "['" . addslashes($teacher['nom'] . ' ' . $teacher['prenom']) . "', " . $teacher['count'] . "],";
                 }
                 ?>
             ]);
@@ -474,13 +482,20 @@ function drawTopTeachersChart() {
             var options = {
                 title: 'Top 3 des enseignants',
                 legend: { position: 'none' },
+                colors: ['#50e3c2'],
+                chartArea: {width: '80%', height: '70%'},
+                hAxis: {
+                    title: 'Nombre d\'étudiants',
+                    minValue: 0
+                },
+                vAxis: {
+                    title: 'Enseignants'
+                }
             };
 
-            var chart = new google.visualization.ColumnChart(document.getElementById('topTeachersChart'));
+            var chart = new google.visualization.BarChart(document.getElementById('topTeachersChart'));
             chart.draw(data, options);
         }
-
-        
     </script>
 </body>
 </html>

@@ -14,19 +14,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $admin = new Admin($db);
 
     $id = isset($_POST['id']) ? $_POST['id'] : null;
-    $nom = $_POST['nom_tag'];
+    $nom_tags = $_POST['nom_tag'];
 
     if ($id) {
-        if ($admin->modifierTag($id, $nom)) {
+        // Editing a single tag
+        if ($admin->modifierTag($id, $nom_tags)) {
             echo json_encode(['success' => true, 'message' => 'Tag modifié avec succès']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Erreur lors de la modification du tag']);
         }
     } else {
-        if ($admin->ajouterTag($nom)) {
-            echo json_encode(['success' => true, 'message' => 'Tag ajouté avec succès']);
+        // Adding one or multiple tags
+        $tags = array_map('trim', explode(',', $nom_tags));
+        $success = true;
+        $added_count = 0;
+
+        foreach ($tags as $tag) {
+            if (!empty($tag)) {
+                if ($admin->ajouterTag($tag)) {
+                    $added_count++;
+                } else {
+                    $success = false;
+                    break;
+                }
+            }
+        }
+
+        if ($success) {
+            echo json_encode(['success' => true, 'message' => $added_count . ' tag(s) ajouté(s) avec succès']);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors de l\'ajout du tag']);
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de l\'ajout des tags']);
         }
     }
 } else {
