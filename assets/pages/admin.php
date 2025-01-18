@@ -38,27 +38,6 @@ $topTeachers = $admin->getTopTeachers();
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link href="../style/style_admin.css" rel="stylesheet">
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-    <style>
-        .pagination {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        .pagination a {
-            color: var(--primary-color);
-            padding: 8px 16px;
-            text-decoration: none;
-            transition: background-color .3s;
-            border: 1px solid #ddd;
-            margin: 0 4px;
-        }
-        .pagination a.active {
-            background-color: var(--primary-color);
-            color: white;
-            border: 1px solid var(--primary-color);
-        }
-        .pagination a:hover:not(.active) {background-color: #ddd;}
-    </style>
    
 </head>
 <body>
@@ -110,12 +89,6 @@ $topTeachers = $admin->getTopTeachers();
                             <?php endforeach; ?>
                         </tbody>
                     </table>
-
-                    <div class="pagination">
-                        <?php for ($i = 1; $i <= $totalPages['etudiants']; $i++): ?>
-                            <a href="?page=<?php echo $i; ?>&tab=etudiants" <?php echo $page == $i ? 'class="active"' : ''; ?>><?php echo $i; ?></a>
-                        <?php endfor; ?>
-                    </div>
                 </div>
             </div>
 
@@ -517,34 +490,8 @@ $topTeachers = $admin->getTopTeachers();
 
         }
 
-        // Add this function to handle pagination clicks
-        $(document).ready(function() {
-            $('.pagination a').on('click', function(e) {
-                e.preventDefault();
-                const url = new URL($(this).attr('href'), window.location.href);
-                const page = url.searchParams.get('page');
-                const tab = url.searchParams.get('tab');
-                
-                // Update the content of the current tab
-                $.ajax({
-                    url: 'admin_ajax.php',
-                    type: 'GET',
-                    data: { page: page, tab: tab },
-                    success: function(response) {
-                        $('#' + tab + ' .card').html(response);
-                        // Update URL without reloading the page
-                        window.history.pushState({}, '', url);
-                    }
-                });
-            });
+        
 
-            // Check URL parameters on page load to set the active tab
-            const urlParams = new URLSearchParams(window.location.search);
-            const activeTab = urlParams.get('tab');
-            if (activeTab) {
-                openTab(activeTab);
-            }
-        });
        
     </script>
 </body>
