@@ -135,5 +135,17 @@ class Cours {
     protected function sanitizeInput($input) {
         return htmlspecialchars(strip_tags($input));
     }
+
+    public function supprimerInscription($matricule_etudiant, $titre_cours) {
+        $query = "DELETE FROM inscris_cours 
+                  WHERE matricule_etudiant = :matricule_etudiant 
+                  AND titre_cours = :titre_cours";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':matricule_etudiant', $matricule_etudiant);
+        $stmt->bindParam(':titre_cours', $titre_cours);
+        
+        return $stmt->execute();
+    }
 }
 

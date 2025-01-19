@@ -219,6 +219,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 }
+
+// Traitement de la suppression d'une inscription
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_enrollment') {
+    $matricule_etudiant = $_POST['matricule_etudiant'];
+    $titre_cours = $_POST['titre_cours'];
+
+    if ($cours->supprimerInscription($matricule_etudiant, $titre_cours)) {
+        $message = "Inscription supprimée avec succès";
+        $enrollments = $cours->getEnrolledCourses($matricule); // Refresh the enrollments list
+    } else {
+        $message = "Erreur lors de la suppression de l'inscription";
+    }
+
+    // Répondre avec un JSON pour les requêtes AJAX
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        try {
+            ob_clean();
+            echo json_encode(['success' => ($message === "Inscription supprimée avec succès"), 'message' => $message]);
+        } catch (Exception $e) {
+            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
+        }
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -498,6 +523,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     <th>Prénom</th>
                                     <th>Titre du cours</th>
                                     <th>Matricule étudiant</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -507,6 +533,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                         <td><?php echo htmlspecialchars($enrollment['prenom']); ?></td>
                                         <td><?php echo htmlspecialchars($enrollment['titre_cours']); ?></td>
                                         <td><?php echo htmlspecialchars($enrollment['matricule_etudiant']); ?></td>
+                                        <td>
+                                            <button class="btn" onclick="deleteEnrollment('<?php echo htmlspecialchars($enrollment['matricule_etudiant']); ?>', '<?php echo htmlspecialchars($enrollment['titre_cours']); ?>')">Supprimer</button>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -752,6 +781,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
 
+        function deleteEnrollment(matricule_etudiant, titre_cours) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cette inscription ?')) {
+                $.ajax({
+                    url: '',
+                    type: 'POST',
+                    data: { 
+                        action: 'delete_enrollment', 
+                        matricule_etudiant: matricule_etudiant,
+                        titre_cours: titre_cours
+                    },
+                    success: function(response) {
+                        try {
+                            var jsonResponse = JSON.parse(response);
+                            showMessage(jsonResponse.message, jsonResponse.success);
+                            if (jsonResponse.success) {
+                                location.reload();
+                            }
+                        } catch (e) {
+                            showMessage("Erreur lors du traitement de la réponse du serveur.", false);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        showMessage("Une erreur s'est produite lors de la suppression de l'inscription: " + error, false);
+                    }
+                });
+            }
+        }
+
         function showMessage(message, isSuccess) {
             var messageElement = $('#message');
             messageElement.text(message);
@@ -774,7 +831,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         });
 
         <?php if (!empty($message)): ?>
-        showMessage("<?php echo addslashes($message); ?>", <?php echo $message === "Cours ajouté avec succès" || $message === "Cours modifié avec succès" || $message === "Cours supprimé avec succès" ? 'true' : 'false'; ?>);
+        showMessage("<?php echo addslashes($message); ?>", <?php echo $message === "Cours ajouté avec succès" || $message === "Cours modifié avec succès" || $message === "Cours supprimé avec succès" || $message === "Inscription supprimée avec succès" ? 'true' : 'false'; ?>);
         <?php endif; ?>
     </script>
     <?php
