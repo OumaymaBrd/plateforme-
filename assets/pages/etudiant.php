@@ -48,7 +48,7 @@ $reservedCourses = $etudiant->getCart($matricule);
             flex-direction: column;
         }
         .sidebar {
-            background-color: #2c3e50;
+            background-color: #1a1a2e;
             color: white;
             padding: 20px;
         }
@@ -86,7 +86,7 @@ $reservedCourses = $etudiant->getCart($matricule);
             padding: 15px;
         }
         .btn {
-            background-color: #3498db;
+            background-color: #1a1a2e;
             color: white;
             border: none;
             padding: 10px 15px;
