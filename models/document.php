@@ -2,8 +2,6 @@
 require_once 'Cours.php';
 
 class CoursDocument extends Cours {
-    public $nombre_pages;
-
     public function ajouterCours() {
         $query = "INSERT INTO " . $this->table_name . " 
                   SET titre=:titre, description=:description, type='document', format=:format, 
@@ -12,13 +10,16 @@ class CoursDocument extends Cours {
 
         $stmt = $this->conn->prepare($query);
 
-        $this->titre = htmlspecialchars(strip_tags($this->titre));
-        $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->format = htmlspecialchars(strip_tags($this->format));
-        $this->tags = htmlspecialchars(strip_tags($this->tags));
-        $this->categorie = htmlspecialchars(strip_tags($this->categorie));
-        $this->matricule_enseignant = htmlspecialchars(strip_tags($this->matricule_enseignant));
-        $this->file_path = htmlspecialchars(strip_tags($this->file_path));
+        $this->titre = $this->sanitizeInput($this->titre);
+        $this->description = $this->sanitizeInput($this->description);
+        $this->format = $this->sanitizeInput($this->format);
+        $this->categorie = $this->sanitizeInput($this->categorie);
+        $this->matricule_enseignant = $this->sanitizeInput($this->matricule_enseignant);
+        $this->file_path = $this->sanitizeInput($this->file_path);
+
+        // Convert tags array to comma-separated string
+        $this->tags = is_array($this->tags) ? implode(', ', $this->tags) : $this->tags;
+        $this->tags = $this->sanitizeInput($this->tags);
 
         $stmt->bindParam(":titre", $this->titre);
         $stmt->bindParam(":description", $this->description);
@@ -29,7 +30,11 @@ class CoursDocument extends Cours {
         $stmt->bindParam(":matricule_enseignant", $this->matricule_enseignant);
         $stmt->bindParam(":file_path", $this->file_path);
 
-        return $stmt->execute();
+        if($stmt->execute()) {
+            $this->id = $this->conn->lastInsertId();
+            return true;
+        }
+        return false;
     }
 
     public function modifierCours() {
@@ -41,15 +46,18 @@ class CoursDocument extends Cours {
             $query .= ", file_path=:file_path";
         }
         
-        $query .= " WHERE id=:id AND type='document'";
+        $query .= " WHERE id=:id";
 
         $stmt = $this->conn->prepare($query);
 
-        $this->titre = htmlspecialchars(strip_tags($this->titre));
-        $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->format = htmlspecialchars(strip_tags($this->format));
-        $this->tags = htmlspecialchars(strip_tags($this->tags));
-        $this->categorie = htmlspecialchars(strip_tags($this->categorie));
+        $this->titre = $this->sanitizeInput($this->titre);
+        $this->description = $this->sanitizeInput($this->description);
+        $this->format = $this->sanitizeInput($this->format);
+        $this->categorie = $this->sanitizeInput($this->categorie);
+
+        // Convert tags array to comma-separated string
+        $this->tags = is_array($this->tags) ? implode(', ', $this->tags) : $this->tags;
+        $this->tags = $this->sanitizeInput($this->tags);
 
         $stmt->bindParam(":titre", $this->titre);
         $stmt->bindParam(":description", $this->description);
@@ -62,15 +70,6 @@ class CoursDocument extends Cours {
         if (isset($this->file_path)) {
             $stmt->bindParam(":file_path", $this->file_path);
         }
-
-        return $stmt->execute();
-    }
-
-    public function supprimerCours() {
-        $query = "UPDATE " . $this->table_name . " SET supprime = 1 WHERE id = :id AND type = 'document'";
-
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":id", $this->id);
 
         return $stmt->execute();
     }

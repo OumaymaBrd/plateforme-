@@ -1,7 +1,17 @@
 <?php
+// Augmenter la limite de taille de fichier à 500 Mo
+ini_set('upload_max_filesize', '500M');
+ini_set('post_max_size', '500M');
+ini_set('memory_limit', '512M');
+set_time_limit(300); // 5 minutes
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once '../../db/Database.php';
 require_once '../../models/user.php';
+require_once '../../models/Cours.php';
 require_once '../../models/document.php';
 require_once '../../models/coursvideos.php';
 
@@ -11,7 +21,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $
     exit();
 }
 
-$matricule = isset($_GET['matricule']) ? htmlspecialchars($_GET['matricule']) : 'N/A';
+$matricule = isset($_GET['matricule']) ? htmlspecialchars($_GET['matricule']) : $_SESSION['user_matricule'];
 
 $database = new Database();
 $db = $database->getConnection();
@@ -20,24 +30,195 @@ $user = new User($db);
 $user->id = $_SESSION['user_id'];
 $user->matricule = $_SESSION['user_matricule'];
 
-$coursDocument = new CoursDocument($db);
-$coursVideo = new CoursVideo($db);
+$cours = new Cours($db);
 
-$coursesDocument = $coursDocument->getCoursesForEnseignant($matricule);
-$coursesVideo = $coursVideo->getCoursesForEnseignant($matricule);
-$courses = array_merge($coursesDocument, $coursesVideo);
+$courses = $cours->getCoursesForEnseignant($matricule);
 
-$categories = $coursDocument->getCategories();
-$tags = $coursDocument->getTags();
+$categories = $cours->getCategories();
+$tags = $cours->getTags();
 
-$message = isset($_GET['message']) ? htmlspecialchars($_GET['message']) : '';
+$message = '';
 
 // Fetch course enrollments
-$enrollments = $coursDocument->getEnrolledCourses($matricule);
+$enrollments = $cours->getEnrolledCourses($matricule);
 
 // Fetch statistics
-$enrolledStudentsCount = $coursDocument->getEnrolledStudentsCount($matricule);
-$coursesCount = $coursDocument->getCoursesCount($matricule);
+$enrolledStudentsCount = $cours->getEnrolledStudentsCount($matricule);
+$coursesCount = $cours->getCoursesCount($matricule);
+
+// Fonction pour gérer l'upload de fichier
+function handleFileUpload($file, $allowedExtensions) {
+    $uploadDir = '../../uploads/';
+    $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($fileExtension, $allowedExtensions)) {
+        return [false, "Format de fichier non autorisé. Formats acceptés : " . implode(', ', $allowedExtensions)];
+    }
+
+    $maxFileSize = 500 * 1024 * 1024; // 500 Mo en bytes
+    if ($file['size'] > $maxFileSize) {
+        return [false, "Le fichier est trop volumineux. La taille maximale est de 500 Mo."];
+    }
+
+    $uniqueFilename = uniqid() . '.' . $fileExtension;
+    $uploadFile = $uploadDir . $uniqueFilename;
+
+    if (move_uploaded_file($file['tmp_name'], $uploadFile)) {
+        return [true, $uploadFile];
+    } else {
+        return [false, "Erreur lors du téléchargement du fichier. Code d'erreur : " . $file['error']];
+    }
+}
+
+// Traitement de l'ajout d'un cours
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_course') {
+    $format = $_POST['format'];
+    $newCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
+
+    $newCours->titre = $_POST['titre'];
+    $newCours->description = $_POST['description'];
+    $newCours->format = $format;
+    $newCours->categorie = $_POST['categorie'];
+    $newCours->matricule_enseignant = $matricule;
+    $newCours->tags = implode(', ', $_POST['tags']);
+
+    if ($format === 'pdf' || $format === 'txt') {
+        $newCours->nombre_pages = $_POST['nombre_pages'];
+        $allowedExtensions = ['pdf', 'txt'];
+    } else {
+        $newCours->duree_minutes = $_POST['duree_minutes'];
+        $allowedExtensions = ['mp4'];
+    }
+
+    if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
+        list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
+        if ($uploadSuccess) {
+            $newCours->file_path = $uploadResult;
+        } else {
+            $message = $uploadResult;
+        }
+    } else {
+        $message = "Aucun fichier n'a été uploadé ou une erreur s'est produite. Code d'erreur : " . $_FILES['file_upload']['error'];
+    }
+
+    if (empty($message)) {
+        if ($newCours->ajouterCours()) {
+            $message = "Cours ajouté avec succès";
+            $courses = $cours->getCoursesForEnseignant($matricule); // Refresh the course list
+        } else {
+            $message = "Erreur lors de l'ajout du cours";
+        }
+    }
+
+    // Répondre avec un JSON pour les requêtes AJAX
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        try {
+            // Assurez-vous que toute sortie précédente est effacée
+            ob_clean();
+            
+            echo json_encode(['success' => ($message === "Cours ajouté avec succès"), 'message' => $message]);
+        } catch (Exception $e) {
+            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
+        }
+        exit;
+    }
+}
+
+// Traitement de la modification d'un cours
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_course') {
+    $format = $_POST['format'];
+    $editCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
+
+    $editCours->id = $_POST['id'];
+    $editCours->titre = $_POST['titre'];
+    $editCours->description = $_POST['description'];
+    $editCours->format = $format;
+    $editCours->categorie = $_POST['categorie'];
+    $editCours->tags = implode(', ', $_POST['tags']);
+
+    // Récupérer les informations existantes du cours
+    $existingCours = new Cours($db);
+    $existingCours->id = $_POST['id'];
+    $existingCours->getCoursById();
+
+    if ($format === 'pdf' || $format === 'txt') {
+        $editCours->nombre_pages = $_POST['nombre_pages'];
+        $allowedExtensions = ['pdf', 'txt'];
+    } else {
+        $editCours->duree_minutes = $_POST['duree_minutes'];
+        $allowedExtensions = ['mp4'];
+    }
+
+    // Gestion du fichier
+    if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
+        list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
+        if ($uploadSuccess) {
+            $editCours->file_path = $uploadResult;
+            // Supprimer l'ancien fichier si un nouveau est uploadé
+            if (file_exists($existingCours->file_path)) {
+                unlink($existingCours->file_path);
+            }
+        } else {
+            $message = $uploadResult;
+        }
+    } else {
+        // Conserver l'ancien chemin de fichier si aucun nouveau fichier n'est uploadé
+        $editCours->file_path = $existingCours->file_path;
+    }
+
+    $editCours->matricule_enseignant = $existingCours->matricule_enseignant;
+
+    if (empty($message)) {
+        if ($editCours->modifierCours()) {
+            $message = "Cours modifié avec succès";
+            $courses = $cours->getCoursesForEnseignant($matricule); // Refresh the course list
+        } else {
+            $message = "Erreur lors de la modification du cours";
+        }
+    }
+
+    // Répondre avec un JSON pour les requêtes AJAX
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        try {
+            // Assurez-vous que toute sortie précédente est effacée
+            ob_clean();
+            
+            echo json_encode(['success' => ($message === "Cours modifié avec succès"), 'message' => $message]);
+        } catch (Exception $e) {
+            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
+        }
+        exit;
+    }
+}
+
+// Traitement de la suppression d'un cours
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_course') {
+    $deleteCours = new Cours($db);
+    $deleteCours->id = $_POST['id'];
+
+    if ($deleteCours->supprimerCours()) {
+        $message = "Cours supprimé avec succès";
+        $courses = $cours->getCoursesForEnseignant($matricule); // Refresh the course list
+    } else {
+        $message = "Erreur lors de la suppression du cours";
+    }
+
+    // Répondre avec un JSON pour les requêtes AJAX
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        try {
+            // Assurez-vous que toute sortie précédente est effacée
+            ob_clean();
+            
+            echo json_encode(['success' => ($message === "Cours supprimé avec succès"), 'message' => $message]);
+        } catch (Exception $e) {
+            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
+        }
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -279,9 +460,9 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
                         <thead>
                             <tr>
                                 <th>Titre</th>
-                                <th>Type</th>
                                 <th>Format</th>
                                 <th>Catégorie</th>
+                                <th>Tags</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -289,12 +470,13 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
                             <?php foreach ($courses as $course): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($course['titre']); ?></td>
-                                    <td><?php echo htmlspecialchars($course['type']); ?></td>
                                     <td><?php echo htmlspecialchars($course['format']); ?></td>
                                     <td><?php echo htmlspecialchars($course['categorie']); ?></td>
+                                    <td><?php echo htmlspecialchars($course['tags']); ?></td>
                                     <td>
                                         <button class="btn" onclick="openEditModal(<?php echo htmlspecialchars(json_encode($course)); ?>)">Modifier</button>
-                                        <button class="btn" onclick="deleteCourse(<?php echo $course['id']; ?>, '<?php echo $course['type']; ?>')">Supprimer</button>
+                                        <button class="btn" onclick="deleteCourse(<?php echo $course['id']; ?>)">Supprimer</button>
+                                        <a href="<?php echo htmlspecialchars($course['file_path']); ?>" target="_blank" class="btn">Afficher</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -336,7 +518,8 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
             <div id="add-course" class="tab-content">
                 <div class="card">
                     <h2>Ajouter un nouveau cours</h2>
-                    <form id="addCourseForm" action="ajouter_cours.php" method="POST" enctype="multipart/form-data">
+                    <form id="addCourseForm" action="" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="add_course">
                         <div class="form-group">
                             <label for="titre">Titre du cours:</label>
                             <input type="text" id="titre" name="titre" required>
@@ -346,30 +529,22 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
                             <textarea id="description" name="description" required></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="type">Type de cours:</label>
-                            <select id="type" name="type" required>
-                                <option value="document">Document</option>
-                                <option value="video">Vidéo</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
                             <label for="format">Format:</label>
-                            <select id="format" name="format" required>
+                            <select id="format" name="format" required onchange="toggleFormatFields()">
                                 <option value="pdf">PDF</option>
+                                <option value="txt">TXT</option>
                                 <option value="mp4">MP4</option>
-                                <option value="avi">AVI</option>
-                                <option value="mov">MOV</option>
                             </select>
                         </div>
                         <div class="form-group" id="file_upload_group">
                             <label for="file_upload">Fichier:</label>
                             <input type="file" id="file_upload" name="file_upload" required>
                         </div>
-                        <div class="form-group" id="nombre_pages_group">
+                        <div class="form-group format-specific" id="nombre_pages_group">
                             <label for="nombre_pages">Nombre de pages:</label>
                             <input type="number" id="nombre_pages" name="nombre_pages">
                         </div>
-                        <div class="form-group" id="duree_minutes_group" style="display:none;">
+                        <div class="form-group format-specific" id="duree_minutes_group" style="display:none;">
                             <label for="duree_minutes">Durée (en minutes):</label>
                             <input type="number" id="duree_minutes" name="duree_minutes">
                         </div>
@@ -389,7 +564,6 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <input type="hidden" name="matricule_enseignant" value="<?php echo $matricule; ?>">
                         <button type="submit" class="btn">Ajouter le cours</button>
                     </form>
                 </div>
@@ -402,9 +576,9 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>Modifier le cours</h2>
-            <form id="editCourseForm" enctype="multipart/form-data">
+            <form id="editCourseForm" action="" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="edit_course">
                 <input type="hidden" id="edit_id" name="id">
-                <input type="hidden" id="edit_type" name="type">
                 <div class="form-group">
                     <label for="edit_titre">Titre du cours:</label>
                     <input type="text" id="edit_titre" name="titre" required>
@@ -415,22 +589,21 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
                 </div>
                 <div class="form-group">
                     <label for="edit_format">Format:</label>
-                    <select id="edit_format" name="format" required>
+                    <select id="edit_format" name="format" required onchange="toggleEditFormatFields()">
                         <option value="pdf">PDF</option>
+                        <option value="txt">TXT</option>
                         <option value="mp4">MP4</option>
-                        <option value="avi">AVI</option>
-                        <option value="mov">MOV</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="edit_file_upload">Nouveau fichier (optionnel):</label>
                     <input type="file" id="edit_file_upload" name="file_upload">
                 </div>
-                <div class="form-group" id="edit_nombre_pages_group">
+                <div class="form-group format-specific" id="edit_nombre_pages_group">
                     <label for="edit_nombre_pages">Nombre de pages:</label>
                     <input type="number" id="edit_nombre_pages" name="nombre_pages">
                 </div>
-                <div class="form-group" id="edit_duree_minutes_group">
+                <div class="form-group format-specific" id="edit_duree_minutes_group" style="display:none;">
                     <label for="edit_duree_minutes">Durée (en minutes):</label>
                     <input type="number" id="edit_duree_minutes" name="duree_minutes">
                 </div>
@@ -458,57 +631,46 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function() {
-            $('#type').change(function() {
-                var nombrePagesGroup = $('#nombre_pages_group');
-                var dureeMinutesGroup = $('#duree_minutes_group');
-                var formatSelect = $('#format');
-                if (this.value === 'document') {
-                    nombrePagesGroup.show();
-                    dureeMinutesGroup.hide();
-                    formatSelect.html('<option value="pdf">PDF</option>');
-                } else {
-                    nombrePagesGroup.hide();
-                    dureeMinutesGroup.show();
-                    formatSelect.html('<option value="mp4">MP4</option><option value="avi">AVI</option><option value="mov">MOV</option>');
-                }
-            });
+            toggleFormatFields();
+            toggleEditFormatFields();
 
-            $('#addCourseForm').submit(function(e) {
+            $('#addCourseForm, #editCourseForm').submit(function(e) {
                 e.preventDefault();
                 var formData = new FormData(this);
+    
+                // Vérifier la taille du fichier
+                var fileInput = $(this).find('input[type="file"]')[0];
+                if (fileInput && fileInput.files[0]) {
+                    var fileSize = fileInput.files[0].size; // en bytes
+                    var maxSize = 500 * 1024 * 1024; // 500 Mo en bytes
+                    if (fileSize > maxSize) {
+                        showMessage("Le fichier est trop volumineux. La taille maximale est de 500 Mo.", false);
+                        return;
+                    }
+                }
 
                 $.ajax({
-                    url: 'ajouter_cours.php',
+                    url: '',
                     type: 'POST',
                     data: formData,
                     success: function(response) {
-                        var result = JSON.parse(response);
-                        showMessage(result.message, result.success);
-                        if (result.success) {
-                            $('#addCourseForm')[0].reset();
-                            location.reload();
+                        try {
+                            var jsonResponse = JSON.parse(response);
+                            showMessage(jsonResponse.message, jsonResponse.success);
+                            if (jsonResponse.success) {
+                                location.reload();
+                            }
+                        } catch (e) {
+                            console.error("Erreur lors du parsing de la réponse JSON:", e);
+                            showMessage("Erreur lors du traitement de la réponse du serveur. Veuillez réessayer.", false);
                         }
                     },
-                    cache: false,
-                    contentType: false,
-                    processData: false
-                });
-            });
-
-            $('#editCourseForm').submit(function(e) {
-                e.preventDefault();
-                var formData = new FormData(this);
-
-                $.ajax({
-                    url: 'modifier_cours.php',
-                    type: 'POST',
-                    data: formData,
-                    success: function(response) {
-                        var result = JSON.parse(response);
-                        showMessage(result.message, result.success);
-                        if (result.success) {
-                            $('#editModal').hide();
-                            location.reload();
+                    error: function(xhr, status, error) {
+                        console.error("Erreur AJAX:", status, error);
+                        if (xhr.status === 413) {
+                            showMessage("Le fichier est trop volumineux. La taille maximale est de 500 Mo.", false);
+                        } else {
+                            showMessage("Une erreur s'est produite lors de la communication avec le serveur. Veuillez réessayer.", false);
                         }
                     },
                     cache: false,
@@ -527,41 +689,64 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
             $('#' + menuId + '-sub').toggleClass('active');
         }
 
+        function toggleFormatFields() {
+            var format = $('#format').val();
+            $('.format-specific').hide();
+            if (format === 'pdf' || format === 'txt') {
+                $('#nombre_pages_group').show();
+            } else if (format === 'mp4') {
+                $('#duree_minutes_group').show();
+            }
+        }
+
+        function toggleEditFormatFields() {
+            var format = $('#edit_format').val();
+            $('.format-specific').hide();
+            if (format === 'pdf' || format === 'txt') {
+                $('#edit_nombre_pages_group').show();
+            } else if (format === 'mp4') {
+                $('#edit_duree_minutes_group').show();
+            }
+        }
+
         function openEditModal(course) {
             $('#edit_id').val(course.id);
-            $('#edit_type').val(course.type);
             $('#edit_titre').val(course.titre);
             $('#edit_description').val(course.description);
-            $('#edit_format').val(course.format);
+            $('#edit_format').val(course.format).change();
             $('#edit_categorie').val(course.categorie);
             
-            if (course.type === 'document') {
-                $('#edit_nombre_pages_group').show();
-                $('#edit_duree_minutes_group').hide();
+            if (course.format === 'pdf' || course.format === 'txt') {
                 $('#edit_nombre_pages').val(course.nombre_pages);
             } else {
-                $('#edit_nombre_pages_group').hide();
-                $('#edit_duree_minutes_group').show();
                 $('#edit_duree_minutes').val(course.duree_minutes);
             }
 
             $('#edit_tags').val(course.tags ? course.tags.split(', ') : []);
             
             $('#editModal').show();
+            toggleEditFormatFields();
         }
 
-        function deleteCourse(id, type) {
+        function deleteCourse(id) {
             if (confirm('Êtes-vous sûr de vouloir supprimer ce cours ?')) {
                 $.ajax({
-                    url: 'supprimer_cours.php',
+                    url: '',
                     type: 'POST',
-                    data: { id: id, type: type },
+                    data: { action: 'delete_course', id: id },
                     success: function(response) {
-                        var result = JSON.parse(response);
-                        showMessage(result.message, result.success);
-                        if (result.success) {
-                            location.reload();
+                        try {
+                            var jsonResponse = JSON.parse(response);
+                            showMessage(jsonResponse.message, jsonResponse.success);
+                            if (jsonResponse.success) {
+                                location.reload();
+                            }
+                        } catch (e) {
+                            showMessage("Erreur lors du traitement de la réponse du serveur.", false);
                         }
+                    },
+                    error: function(xhr, status, error) {
+                        showMessage("Une erreur s'est produite lors de la suppression: " + error, false);
                     }
                 });
             }
@@ -575,7 +760,7 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
             messageElement.show();
             setTimeout(function() {
                 messageElement.fadeOut();
-            }, 120000); // 2 minutes
+            }, 5000);
         }
 
         $('.close').click(function() {
@@ -587,7 +772,16 @@ $coursesCount = $coursDocument->getCoursesCount($matricule);
                 $('#editModal').hide();
             }
         });
+
+        <?php if (!empty($message)): ?>
+        showMessage("<?php echo addslashes($message); ?>", <?php echo $message === "Cours ajouté avec succès" || $message === "Cours modifié avec succès" || $message === "Cours supprimé avec succès" ? 'true' : 'false'; ?>);
+        <?php endif; ?>
     </script>
+    <?php
+        function logError($message) {
+            error_log(date('[Y-m-d H:i:s] ') . $message . "\n", 3, '../../logs/error.log');
+        }
+    ?>
 </body>
 </html>
 
