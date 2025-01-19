@@ -245,12 +245,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
-    <a href="accueil.html" class="home-link">Accueil</a>
+    
 
     <section class="container">
         <div class="login-container">
             <div class="circle circle-one"></div>
             <div class="form-container">
+            <a href="home.php" class="opacity">Accueil</a>
                 <h1 class="opacity">Inscription</h1>
                 <?php if ($message && !$showModal): ?>
                     <div class="message <?php echo $messageType; ?>">
@@ -269,6 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="email" name="email" id="email" placeholder="Email" required>
                     <input type="password" name="mot_passe" id="mot_passe" placeholder="Mot de passe" required>
                     <button class="opacity" type="submit">S'inscrire</button>
+                  
                 </form>
             </div>
             <div class="circle circle-two"></div>

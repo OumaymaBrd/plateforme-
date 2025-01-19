@@ -132,6 +132,7 @@ class Admin {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // regler autre fois 
     public function getopCourses() {
         $query = "SELECT titre_cours, COUNT(*) as count 
                   FROM inscris_cours

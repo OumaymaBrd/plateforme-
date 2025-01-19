@@ -78,7 +78,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     <section class="container">
         <div class="login-container">
             <div class="circle circle-one"></div>
+           
             <div class="form-container">
+          
                 <img src="https://raw.githubusercontent.com/hicodersofficial/glassmorphism-login-form/master/assets/illustration.png" alt="illustration" class="illustration" />
                 <h1 class="opacity">Login</h1>
                 <?php if (!empty($error)): ?>
@@ -86,10 +88,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                         <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
+                
                 <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                     <input type="text" name="matricule" placeholder="Matricule" required />
                     <input type="password" name="mot_passe" placeholder="Mot de Passe" required />
+                   
                     <button type="submit" name="login" class="opacity">Se connecter</button>
+                    <a href="../../index.php" class="opacity">Inscription</a>
                 </form>
                 <div class="register-forget opacity">
                     <a href=""></a>
