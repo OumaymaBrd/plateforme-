@@ -177,6 +177,15 @@ $reservedCourses = $etudiant->getCart($matricule);
             background-color: #e74c3c;
             color: white;
         }
+        .close-message {
+            background: none;
+            border: none;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
         @media (min-width: 768px) {
             .container {
                 flex-direction: row;
@@ -261,6 +270,7 @@ $reservedCourses = $etudiant->getCart($matricule);
                                 <p><i class="fas fa-calendar-alt"></i> <?php echo htmlspecialchars($course['date_creation']); ?></p>
                                 <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p>
                                 <p><i class="fas fa-folder"></i> <?php echo htmlspecialchars($course['categorie']); ?></p>
+                                <p><i class="fas fa-tags"></i> <?php echo htmlspecialchars($course['tags']); ?></p>
                                 <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button>
                                 <?php if ($etudiant->isCoursReserved($course['titre'], $matricule)): ?>
                                     <button class="btn btn-disabled" disabled>Déjà réservé</button>
@@ -287,6 +297,7 @@ $reservedCourses = $etudiant->getCart($matricule);
                                 <h3><?php echo htmlspecialchars($course['titre_cours']); ?></h3>
                                 <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p>
                                 <p><i class="fas fa-folder"></i> <?php echo isset($course['categorie']) ? htmlspecialchars($course['categorie']) : 'Non catégorisé'; ?></p>
+                                <p><i class="fas fa-tags"></i> <?php echo isset($course['tags']) ? htmlspecialchars($course['tags']) : 'Aucun tag'; ?></p>
                                 <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button>
                                 <button class="btn" onclick="removeReservation('<?php echo $course['titre_cours']; ?>', '<?php echo $matricule; ?>')">Annuler la réservation</button>
                             </div>
@@ -334,7 +345,7 @@ $reservedCourses = $etudiant->getCart($matricule);
             $('#modalFormat').text('Format: ' + course.format);
             $('#modalPages').text(course.nombre_pages ? 'Nombre de pages: ' + course.nombre_pages : '');
             $('#modalCategory').text('Catégorie: ' + course.categorie);
-            $('#modalTags').text('Tags: ' + course.tags);
+            $('#modalTags').text('Tags: ' + (course.tags || 'Aucun tag'));
             $('#modalFileLink').attr('href', course.file_path);
             $('#courseModal').show();
         }
@@ -382,9 +393,15 @@ $reservedCourses = $etudiant->getCart($matricule);
             messageElement.removeClass('success error');
             messageElement.addClass(isSuccess ? 'success' : 'error');
             messageElement.show();
-            setTimeout(function() {
+            
+            // Ajouter un bouton de fermeture
+            var closeButton = $('<button>').text('X').addClass('close-message');
+            messageElement.append(closeButton);
+            
+            // Gérer la fermeture du message
+            closeButton.on('click', function() {
                 messageElement.hide();
-            }, 3000);
+            });
         }
 
         $(document).ready(function() {
@@ -417,13 +434,9 @@ $reservedCourses = $etudiant->getCart($matricule);
 
             if ($('.course-card').length === 0) {
                 $('#no-results').show();
-                setTimeout(function() {
-                    $('#no-results').hide();
-                }, 3000);
             }
         });
     </script>
-    
 </body>
 </html>
 
