@@ -132,6 +132,17 @@ class Admin {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getopCourses() {
+        $query = "SELECT titre_cours, COUNT(*) as count 
+                  FROM inscris_cours
+                  GROUP BY titre_cours 
+                  ORDER BY count DESC 
+                  LIMIT 3";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getTopTeachers() {
         $query = "SELECT u.nom, u.prenom, COUNT(*) as count
                   FROM user_ u

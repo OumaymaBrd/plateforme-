@@ -23,7 +23,7 @@ $tags = $admin->getTags();
 // Fetch statistics
 $totalCourses = $admin->getTotalCourses();
 $coursesByCategory = $admin->getCoursesByCategory();
-$topCourses = $admin->getTopCourses();
+$topCourses = $admin->getopCourses();
 $topTeachers = $admin->getTopTeachers();
 ?>
 
@@ -244,6 +244,28 @@ $topTeachers = $admin->getTopTeachers();
                         <div class="chart" id="coursesByCategoryChart"></div>
                         <div class="chart" id="topCoursesChart"></div>
                         <div class="chart" id="topTeachersChart"></div>
+
+                        <div class="chart" id="topTeachersChart">
+
+                         <?php
+
+if (!empty($topCourses)) {
+    echo "<h2>Top 3 des cours les plus populaires</h2>";
+    echo "<table border='1'>";
+    echo "<tr><th>Titre du cours</th><th>Nombre d'inscriptions</th></tr>";
+    foreach ($topCourses as $course) {
+        echo "<tr>";
+        echo "<td>" . htmlspecialchars($course['titre_cours']) . "</td>";
+        echo "<td>" . $course['count'] . "</td>";
+        echo "</tr>";
+    }
+    echo "</table>";
+} else {
+    echo "<p>Aucun cours trouvé.</p>";
+}              
+                         ?>
+                        </div>
+                       
                     </div>
                 </div>
             </div>
@@ -444,17 +466,11 @@ $topTeachers = $admin->getTopTeachers();
             ]);
 
             var options = {
-                title: 'Top 3 des cours les plus populaires',
-                legend: { position: 'none' },
-                colors: ['#4a90e2'],
-                chartArea: {width: '80%', height: '70%'},
-                hAxis: {
-                    title: 'Nombre d\'étudiants',
-                    minValue: 0
-                },
-                vAxis: {
-                    title: 'Cours'
-                }
+                title: 'Répartition des cours par catégorie',
+                pieHole: 0.4,
+                colors: ['#4a90e2', '#50e3c2', '#f5a623', '#d0021b', '#9013fe'],
+                chartArea: {width: '0%', height: '90%'},
+                legend: {position: 'bottom'}
             };
 
             var chart = new google.visualization.BarChart(document.getElementById('topCoursesChart'));
