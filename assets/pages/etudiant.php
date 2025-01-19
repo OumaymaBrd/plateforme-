@@ -423,7 +423,7 @@ $reservedCourses = $etudiant->getCart($matricule);
             }
         });
     </script>
-    <!--  -->
+    
 </body>
 </html>
 
