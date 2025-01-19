@@ -8,15 +8,22 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'etudiant') {
     exit();
 }
 
-$matricule = isset($_GET['matricule']) ? htmlspecialchars($_GET['matricule']) : 'N/A';
+$matricule = isset($_SESSION['user_matricule']) ? $_SESSION['user_matricule'] : 'N/A';
 
 $database = new Database();
 $db = $database->getConnection();
 
 $etudiant = new Etudiant($db);
 $categories = $etudiant->getCategories();
-$selectedCategory = isset($_GET['category']) ? $_GET['category'] : null;
-$courses = $etudiant->getCourses($selectedCategory);
+$selectedCategory = isset($_GET['category']) ? $_GET['category'] : '';
+$searchTerm = isset($_GET['search']) ? $_GET['search'] : '';
+$currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$itemsPerPage = 4;
+
+$courses = $etudiant->getCourses($selectedCategory, $currentPage, $itemsPerPage, $searchTerm);
+$totalCourses = $etudiant->getTotalCourses($selectedCategory, $searchTerm);
+
+$totalPages = ceil($totalCourses / $itemsPerPage);
 $reservedCourses = $etudiant->getCart($matricule);
 ?>
 
@@ -29,70 +36,45 @@ $reservedCourses = $etudiant->getCart($matricule);
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --primary-color: #1a1a2e;
-            --secondary-color: #16213e;
-            --accent-color: #0f3460;
-            --text-color: #e94560;
-            --light-color: #f1f1f1;
-            --dark-color: #121212;
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: var(--light-color);
-            color: var(--dark-color);
-            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
         }
         .container {
             display: flex;
             min-height: 100vh;
+            flex-direction: column;
         }
         .sidebar {
-            width: 250px;
-            background-color: var(--primary-color);
-            color: var(--light-color);
+            background-color: #2c3e50;
+            color: white;
             padding: 20px;
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
+        }
+        .sidebar h2 {
+            margin-bottom: 30px;
+        }
+        .menu-item {
+            padding: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .menu-item:hover, .menu-item.active {
+            background-color: #34495e;
         }
         .main-content {
             flex: 1;
             padding: 20px;
-            margin-left: 250px;
-        }
-        h1, h2, h3 {
-            color: var(--primary-color);
-            margin-bottom: 20px;
-        }
-        .sidebar h2 {
-            color: var(--light-color);
-            margin-bottom: 20px;
-        }
-        .menu-item {
-            padding: 10px 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .menu-item:hover {
-            background-color: var(--secondary-color);
-        }
-        .menu-item.active {
-            background-color: var(--accent-color);
         }
         .card {
             background-color: white;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             padding: 20px;
             margin-bottom: 20px;
         }
-        .course-list, .reserved-courses {
+        .course-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 20px;
@@ -100,45 +82,50 @@ $reservedCourses = $etudiant->getCart($matricule);
         .course-card {
             background-color: white;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-        .course-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 15px;
         }
         .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: var(--accent-color);
-            color: var(--light-color);
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
+            background-color: #3498db;
+            color: white;
             border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
         .btn:hover {
-            background-color: var(--secondary-color);
-        }
-        .btn-disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .btn-disabled:hover {
-            background-color: #ccc;
+            background-color: #2980b9;
         }
         .search-container {
-            display: flex;
-            gap: 10px;
             margin-bottom: 20px;
         }
-        .search-container input[type="text"], .search-container select {
+        .search-container input, .search-container select {
             padding: 10px;
+            margin-right: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
-            flex-grow: 1;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .pagination a {
+            color: #3498db;
+            padding: 8px 16px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+            border: 1px solid #ddd;
+            margin: 0 4px 8px 4px;
+        }
+        .pagination a.active {
+            background-color: #3498db;
+            color: white;
+            border: 1px solid #3498db;
         }
         .modal {
             display: none;
@@ -157,7 +144,7 @@ $reservedCourses = $etudiant->getCart($matricule);
             padding: 20px;
             border: 1px solid #888;
             width: 80%;
-            max-width: 600px;
+            max-width: 500px;
             border-radius: 8px;
         }
         .close {
@@ -169,7 +156,7 @@ $reservedCourses = $etudiant->getCart($matricule);
         }
         .close:hover,
         .close:focus {
-            color: #000;
+            color: black;
             text-decoration: none;
             cursor: pointer;
         }
@@ -179,16 +166,56 @@ $reservedCourses = $etudiant->getCart($matricule);
             right: 20px;
             padding: 10px 20px;
             border-radius: 5px;
-            color: white;
-            font-weight: bold;
-            z-index: 1000;
             display: none;
+            z-index: 1000;
         }
-        #message.success {
-            background-color: #4CAF50;
+        .success {
+            background-color: #2ecc71;
+            color: white;
         }
-        #message.error {
-            background-color: #f44336;
+        .error {
+            background-color: #e74c3c;
+            color: white;
+        }
+        @media (min-width: 768px) {
+            .container {
+                flex-direction: row;
+            }
+            .sidebar {
+                width: 250px;
+            }
+            .search-container input, .search-container select {
+                width: auto;
+                margin-bottom: 0;
+            }
+        }
+        @media (max-width: 767px) {
+            .sidebar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px;
+            }
+            .sidebar h2 {
+                margin-bottom: 0;
+            }
+            .menu-items {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background-color: #2c3e50;
+                z-index: 1000;
+            }
+            .menu-items.show {
+                display: block;
+            }
+            .menu-toggle {
+                display: block;
+                font-size: 24px;
+                cursor: pointer;
+            }
         }
     </style>
 </head>
@@ -196,9 +223,12 @@ $reservedCourses = $etudiant->getCart($matricule);
     <div class="container">
         <div class="sidebar">
             <h2>Youdemy</h2>
-            <div class="menu-item active" onclick="openTab('courses')">Cours disponibles</div>
-            <div class="menu-item" onclick="openTab('reserved-courses')">Cours réservés</div>
-            <div class="menu-item" onclick="location.href='../../models/logout.php'">Se déconnecter</div>
+            <div class="menu-toggle">&#9776;</div>
+            <div class="menu-items">
+                <div class="menu-item active" onclick="openTab('courses')">Cours disponibles</div>
+                <div class="menu-item" onclick="openTab('reserved-courses')">Cours réservés</div>
+                <div class="menu-item" onclick="location.href='../../models/logout.php'">Se déconnecter</div>
+            </div>
         </div>
         <div class="main-content">
             <div class="card">
@@ -210,21 +240,27 @@ $reservedCourses = $etudiant->getCart($matricule);
                 <div class="card">
                     <h2>Cours disponibles</h2>
                     <div class="search-container">
-                        <input type="text" id="searchInput" placeholder="Rechercher un cours...">
-                        <select id="categoryFilter">
-                            <option value="">Toutes les catégories</option>
-                            <?php foreach ($categories as $category): ?>
-                                <option value="<?php echo htmlspecialchars($category); ?>"><?php echo htmlspecialchars($category); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button class="btn" onclick="searchCourses()">Rechercher</button>
+                        <form action="" method="GET" id="searchForm">
+                            <input type="text" id="searchInput" name="search" placeholder="Rechercher un cours..." value="<?php echo htmlspecialchars($searchTerm); ?>">
+                            <select id="categoryFilter" name="category">
+                                <option value="">Toutes les catégories</option>
+                                <?php foreach ($categories as $category): ?>
+                                    <option value="<?php echo htmlspecialchars($category); ?>" <?php echo $selectedCategory === $category ? 'selected' : ''; ?>><?php echo htmlspecialchars($category); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="submit" class="btn">Rechercher</button>
+                        </form>
                     </div>
                     <div id="course-list" class="course-list">
+                        <?php if (empty($courses)): ?>
+                            <p id="no-results" style="display: none;">Aucun résultat trouvé pour cette catégorie.</p>
+                        <?php endif; ?>
                         <?php foreach ($courses as $course): ?>
                             <div class="course-card">
                                 <h3><?php echo htmlspecialchars($course['titre']); ?></h3>
                                 <p><i class="fas fa-calendar-alt"></i> <?php echo htmlspecialchars($course['date_creation']); ?></p>
                                 <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p>
+                                <p><i class="fas fa-folder"></i> <?php echo htmlspecialchars($course['categorie']); ?></p>
                                 <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button>
                                 <?php if ($etudiant->isCoursReserved($course['titre'], $matricule)): ?>
                                     <button class="btn btn-disabled" disabled>Déjà réservé</button>
@@ -234,18 +270,24 @@ $reservedCourses = $etudiant->getCart($matricule);
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <div class="pagination">
+                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                            <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($searchTerm); ?>&category=<?php echo urlencode($selectedCategory); ?>" <?php echo $currentPage == $i ? 'class="active"' : ''; ?>><?php echo $i; ?></a>
+                        <?php endfor; ?>
+                    </div>
                 </div>
             </div>
 
             <div id="reserved-courses" class="tab-content" style="display:none;">
                 <div class="card">
                     <h2>Vos cours réservés</h2>
-                    <div class="reserved-courses">
+                    <div class="reserved-courses course-list">
                         <?php foreach ($reservedCourses as $course): ?>
                             <div class="course-card">
                                 <h3><?php echo htmlspecialchars($course['titre_cours']); ?></h3>
-                                <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p> <br> <br>
-                                <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button> <br> <br> 
+                                <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p>
+                                <p><i class="fas fa-folder"></i> <?php echo isset($course['categorie']) ? htmlspecialchars($course['categorie']) : 'Non catégorisé'; ?></p>
+                                <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button>
                                 <button class="btn" onclick="removeReservation('<?php echo $course['titre_cours']; ?>', '<?php echo $matricule; ?>')">Annuler la réservation</button>
                             </div>
                         <?php endforeach; ?>
@@ -280,6 +322,9 @@ $reservedCourses = $etudiant->getCart($matricule);
             $('.menu-item').filter(function() {
                 return $(this).text().toLowerCase().includes(tabName.replace('-', ' '));
             }).addClass('active');
+            if ($(window).width() <= 767) {
+                $('.menu-items').removeClass('show');
+            }
         }
 
         function showDetails(course) {
@@ -331,19 +376,6 @@ $reservedCourses = $etudiant->getCart($matricule);
             });
         }
 
-        function searchCourses() {
-            var searchTerm = $('#searchInput').val();
-            var category = $('#categoryFilter').val();
-            $.ajax({
-                url: 'search_courses.php',
-                type: 'GET',
-                data: { search: searchTerm, category: category },
-                success: function(response) {
-                    $('#course-list').html(response);
-                }
-            });
-        }
-
         function showMessage(message, isSuccess) {
             var messageElement = $('#message');
             messageElement.text(message);
@@ -366,15 +398,29 @@ $reservedCourses = $etudiant->getCart($matricule);
                 }
             });
 
-            $('#searchInput').on('keyup', function(e) {
-                if (e.key === 'Enter') {
-                    searchCourses();
+            $('.menu-toggle').click(function() {
+                $('.menu-items').toggleClass('show');
+            });
+
+            $(window).resize(function() {
+                if ($(window).width() > 767) {
+                    $('.menu-items').removeClass('show');
                 }
             });
 
-            $('#categoryFilter').change(function() {
-                searchCourses();
+            $('#searchForm').submit(function(e) {
+                e.preventDefault();
+                var searchTerm = $('#searchInput').val();
+                var category = $('#categoryFilter').val();
+                window.location.href = '?search=' + encodeURIComponent(searchTerm) + '&category=' + encodeURIComponent(category);
             });
+
+            if ($('.course-card').length === 0) {
+                $('#no-results').show();
+                setTimeout(function() {
+                    $('#no-results').hide();
+                }, 3000);
+            }
         });
     </script>
 </body>

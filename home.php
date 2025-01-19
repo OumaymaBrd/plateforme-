@@ -42,7 +42,7 @@ $totalPages = ceil($totalCourses / $coursesPerPage);
                     <li><a href="#features">Fonctionnalités</a></li>
                     <li><a href="#testimonials">Témoignages</a></li>
                     <li><a href="assets/pages/login.php">Connexion</a></li>
-                    <li><a href="register.php" class="btn">Inscription</a></li>
+                    <li><a href="index.php" class="btn">Inscription</a></li>
                 </ul>
             </nav>
         </div>

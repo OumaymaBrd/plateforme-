@@ -9,7 +9,9 @@ class Etudiant extends User {
         $this->conn = $db;
     }
 
-    public function getCourses($category = null) {
+    public function getCourses($category = null, $currentPage = 1, $itemsPerPage = 10, $searchTerm = '') {
+        $offset = ($currentPage - 1) * $itemsPerPage;
+        
         $query = "SELECT c.id, c.titre, c.description, c.date_creation, c.type, c.format, 
                   c.file_path, c.nombre_pages, c.tags, c.categorie, 
                   u.nom, u.prenom, c.matricule_enseignant
@@ -17,19 +19,61 @@ class Etudiant extends User {
                   JOIN user_ u ON u.matricule = c.matricule_enseignant
                   WHERE c.supprime = 0";
         
+        $params = array();
+        
         if ($category) {
             $query .= " AND c.categorie = :category";
+            $params[':category'] = $category;
         }
+        
+        if ($searchTerm) {
+            $query .= " AND (c.titre LIKE :searchTerm OR c.description LIKE :searchTerm)";
+            $params[':searchTerm'] = "%{$searchTerm}%";
+        }
+        
+        $query .= " ORDER BY c.date_creation DESC LIMIT :limit OFFSET :offset";
+        $params[':limit'] = $itemsPerPage;
+        $params[':offset'] = $offset;
         
         $stmt = $this->conn->prepare($query);
         
-        if ($category) {
-            $stmt->bindParam(':category', $category);
+        foreach ($params as $key => &$val) {
+            if ($key == ':limit' || $key == ':offset') {
+                $stmt->bindValue($key, $val, PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue($key, $val);
+            }
         }
         
         $stmt->execute();
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getTotalCourses($category = null, $searchTerm = '') {
+        $query = "SELECT COUNT(*) FROM cours c WHERE c.supprime = 0";
+        
+        $params = array();
+        
+        if ($category) {
+            $query .= " AND c.categorie = :category";
+            $params[':category'] = $category;
+        }
+        
+        if ($searchTerm) {
+            $query .= " AND (c.titre LIKE :searchTerm OR c.description LIKE :searchTerm)";
+            $params[':searchTerm'] = "%{$searchTerm}%";
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        
+        foreach ($params as $key => &$val) {
+            $stmt->bindValue($key, $val);
+        }
+        
+        $stmt->execute();
+        
+        return $stmt->fetchColumn();
     }
 
     public function getCategories() {
@@ -37,31 +81,6 @@ class Etudiant extends User {
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
-    }
-
-    public function searchCourses($searchTerm, $category = null) {
-        $query = "SELECT c.id, c.titre, c.description, c.date_creation, c.type, c.format, 
-                  c.file_path, c.nombre_pages, c.tags, c.categorie, 
-                  u.nom, u.prenom, c.matricule_enseignant
-                  FROM cours c
-                  JOIN user_ u ON u.matricule = c.matricule_enseignant
-                  WHERE c.supprime = 0 AND c.titre LIKE :searchTerm";
-        
-        if ($category) {
-            $query .= " AND c.categorie = :category";
-        }
-        
-        $stmt = $this->conn->prepare($query);
-        $searchTerm = "%{$searchTerm}%";
-        $stmt->bindParam(':searchTerm', $searchTerm);
-        
-        if ($category) {
-            $stmt->bindParam(':category', $category);
-        }
-        
-        $stmt->execute();
-        
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function isCoursReserved($titre_cours, $matricule_etudiant) {
@@ -93,7 +112,7 @@ class Etudiant extends User {
     }
 
     public function getCart($matricule_etudiant) {
-        $query = "SELECT ic.*, c.description, c.type, c.format, c.file_path, u.nom, u.prenom
+        $query = "SELECT ic.*, c.description, c.type, c.format, c.file_path, c.categorie, u.nom, u.prenom
                   FROM inscris_cours ic
                   JOIN cours c ON ic.titre_cours = c.titre AND ic.matricule_enseignant = c.matricule_enseignant
                   JOIN user_ u ON ic.matricule_enseignant = u.matricule
