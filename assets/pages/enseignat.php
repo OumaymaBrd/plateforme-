@@ -1,8 +1,9 @@
 <?php
+// Augmenter la limite de taille de fichier à 500 Mo
 ini_set('upload_max_filesize', '500M');
 ini_set('post_max_size', '500M');
 ini_set('memory_limit', '512M');
-set_time_limit(300); // Maximent 5 minutes
+set_time_limit(300); // 5 minutes
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -13,6 +14,7 @@ require_once '../../models/user.php';
 require_once '../../models/Cours.php';
 require_once '../../models/document.php';
 require_once '../../models/coursvideos.php';
+require_once '../../models/Tags_courses.php';
 
 // Vérification de l'authentification et des autorisations
 if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $_SESSION['user_status'] !== 'accepter') {
@@ -29,20 +31,29 @@ $user = new User($db);
 $user->id = $_SESSION['user_id'];
 $user->matricule = $_SESSION['user_matricule'];
 
-$cours = new Cours($db);
+// Instead of instantiating Cours directly, we'll use it for static method calls
+$coursHelper = new CoursDocument($db); // Using CoursDocument as a helper, but we could use CoursVideo too
+$tags_courses = new Tags_courses($db);
 
-$courses = $cours->getCoursesForEnseignant($matricule);
+$courses = $coursHelper->getCoursesForEnseignant($matricule);
 
-$categories = $cours->getCategories();
-$tags = $cours->getTags();
+$categories = $coursHelper->getCategories();
+$tags = $coursHelper->getTags();
+
+// Convert categories and tags to JSON for use in JavaScript
+$categoriesJson = json_encode($categories);
+$tagsJson = json_encode($tags);
 
 $message = '';
 
-$enrollments = $cours->getEnrolledCourses($matricule);
+// Fetch course enrollments
+$enrollments = $coursHelper->getEnrolledCourses($matricule);
 
-$enrolledStudentsCount = $cours->getEnrolledStudentsCount($matricule);
-$coursesCount = $cours->getCoursesCount($matricule);
+// Fetch statistics
+$enrolledStudentsCount = $coursHelper->getEnrolledStudentsCount($matricule);
+$coursesCount = $coursHelper->getCoursesCount($matricule);
 
+// Fonction pour gérer l'upload de fichier
 function handleFileUpload($file, $allowedExtensions) {
     $uploadDir = '../../uploads/';
     $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -76,7 +87,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $newCours->format = $format;
     $newCours->categorie = $_POST['categorie'];
     $newCours->matricule_enseignant = $matricule;
-    $newCours->tags = implode(', ', $_POST['tags']);
 
     if ($format === 'pdf' || $format === 'txt') {
         $newCours->nombre_pages = $_POST['nombre_pages'];
@@ -99,8 +109,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (empty($message)) {
         if ($newCours->ajouterCours()) {
+            $coursId = $newCours->id;
+            $tags_courses = new Tags_courses($db);
+            foreach ($_POST['tags'] as $tagId) {
+                $tags_courses->addTagToCourse($coursId, $tagId);
+            }
             $message = "Cours ajouté avec succès";
-            $courses = $cours->getCoursesForEnseignant($matricule); // Refresh the course list
+            $courses = $coursHelper->getCoursesForEnseignant($matricule); // Refresh the course list
         } else {
             $message = "Erreur lors de l'ajout du cours";
         }
@@ -134,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $editCours->tags = implode(', ', $_POST['tags']);
 
     // Récupérer les informations existantes du cours
-    $existingCours = new Cours($db);
+    $existingCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
     $existingCours->id = $_POST['id'];
     $existingCours->getCoursById();
 
@@ -167,8 +182,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (empty($message)) {
         if ($editCours->modifierCours()) {
+            $tags_courses = new Tags_courses($db);
+            $tags_courses->removeTagsFromCourse($editCours->id);
+            foreach ($_POST['tags'] as $tagId) {
+                $tags_courses->addTagToCourse($editCours->id, $tagId);
+            }
             $message = "Cours modifié avec succès";
-            $courses = $cours->getCoursesForEnseignant($matricule); // Refresh the course list
+            $courses = $coursHelper->getCoursesForEnseignant($matricule); // Refresh the course list
         } else {
             $message = "Erreur lors de la modification du cours";
         }
@@ -191,12 +211,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Traitement de la suppression d'un cours
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_course') {
-    $deleteCours = new Cours($db);
+    $deleteCours = new CoursDocument($db); // We can use either CoursDocument or CoursVideo here
     $deleteCours->id = $_POST['id'];
 
     if ($deleteCours->supprimerCours()) {
         $message = "Cours supprimé avec succès";
-        $courses = $cours->getCoursesForEnseignant($matricule); // Refresh the course list
+        $courses = $coursHelper->getCoursesForEnseignant($matricule); // Refresh the course list
     } else {
         $message = "Erreur lors de la suppression du cours";
     }
@@ -221,9 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $matricule_etudiant = $_POST['matricule_etudiant'];
     $titre_cours = $_POST['titre_cours'];
 
-    if ($cours->supprimerInscription($matricule_etudiant, $titre_cours)) {
+    if ($coursHelper->supprimerInscription($matricule_etudiant, $titre_cours)) {
         $message = "Inscription supprimée avec succès";
-        $enrollments = $cours->getEnrolledCourses($matricule); // Refresh the enrollments list
+        $enrollments = $coursHelper->getEnrolledCourses($matricule); // Refresh the enrollments list
     } else {
         $message = "Erreur lors de la suppression de l'inscription";
     }
@@ -241,6 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -264,19 +285,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         </div>
         <div class="main-content">
             <div class="card">
-                <h1>Bienvenue, <?php echo htmlspecialchars($_SESSION['user_prenom'] . ' ' . $_SESSION['user_nom']); ?></h1>
-                <p>Matricule: <?php echo $matricule; ?></p>
+                <h1>Bienvenue, <?php echo isset($_SESSION['user_prenom']) && isset($_SESSION['user_nom']) ? htmlspecialchars($_SESSION['user_prenom'] . ' ' . $_SESSION['user_nom']) : ''; ?></h1>
+                <p>Matricule: <?php echo isset($matricule) ? $matricule : ''; ?></p>
             </div>
 
             <div id="message"></div>
 
             <div class="statistics">
                 <div class="statistic-item">
-                    <div class="statistic-value"><?php echo $enrolledStudentsCount; ?></div>
+                    <div class="statistic-value"><?php echo isset($enrolledStudentsCount) ? $enrolledStudentsCount : ''; ?></div>
                     <div>Étudiants inscrits</div>
                 </div>
                 <div class="statistic-item">
-                    <div class="statistic-value"><?php echo $coursesCount; ?></div>
+                    <div class="statistic-value"><?php echo isset($coursesCount) ? $coursesCount : ''; ?></div>
                     <div>Cours créés</div>
                 </div>
             </div>
@@ -297,14 +318,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <tbody>
                             <?php foreach ($courses as $course): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($course['titre']); ?></td>
-                                    <td><?php echo htmlspecialchars($course['format']); ?></td>
-                                    <td><?php echo htmlspecialchars($course['categorie']); ?></td>
-                                    <td><?php echo htmlspecialchars($course['tags']); ?></td>
+                                    <td><?php echo isset($course['titre']) ? htmlspecialchars($course['titre']) : ''; ?></td>
+                                    <td><?php echo isset($course['format']) ? htmlspecialchars($course['format']) : ''; ?></td>
+                                    <td><?php echo isset($course['categorie']) ? htmlspecialchars($course['categorie']) : ''; ?></td>
+                                    <td><?php echo isset($course['tags']) ? htmlspecialchars($course['tags']) : ''; ?></td>
                                     <td>
                                         <button class="btn" onclick="openEditModal(<?php echo htmlspecialchars(json_encode($course)); ?>)">Modifier</button>
                                         <button class="btn" onclick="deleteCourse(<?php echo $course['id']; ?>)">Supprimer</button>
-                                        <a href="<?php echo htmlspecialchars($course['file_path']); ?>" target="_blank" class="btn">Afficher</a>
+                                        <a href="<?php echo isset($course['file_path']) ? htmlspecialchars($course['file_path']) : ''; ?>" target="_blank" class="btn">Afficher</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -332,12 +353,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <tbody>
                                 <?php foreach ($enrollments as $enrollment): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($enrollment['nom']); ?></td>
-                                        <td><?php echo htmlspecialchars($enrollment['prenom']); ?></td>
-                                        <td><?php echo htmlspecialchars($enrollment['titre_cours']); ?></td>
-                                        <td><?php echo htmlspecialchars($enrollment['matricule_etudiant']); ?></td>
+                                        <td><?php echo isset($enrollment['nom']) ? htmlspecialchars($enrollment['nom']) : ''; ?></td>
+                                        <td><?php echo isset($enrollment['prenom']) ? htmlspecialchars($enrollment['prenom']) : ''; ?></td>
+                                        <td><?php echo isset($enrollment['titre_cours']) ? htmlspecialchars($enrollment['titre_cours']) : ''; ?></td>
+                                        <td><?php echo isset($enrollment['matricule_etudiant']) ? htmlspecialchars($enrollment['matricule_etudiant']) : ''; ?></td>
                                         <td>
-                                            <button class="btn" onclick="deleteEnrollment('<?php echo htmlspecialchars($enrollment['matricule_etudiant']); ?>', '<?php echo htmlspecialchars($enrollment['titre_cours']); ?>')">Supprimer</button>
+                                            <button class="btn" onclick="deleteEnrollment('<?php echo isset($enrollment['matricule_etudiant']) ? htmlspecialchars($enrollment['matricule_etudiant']) : ''; ?>', '<?php echo isset($enrollment['titre_cours']) ? htmlspecialchars($enrollment['titre_cours']) : ''; ?>')">Supprimer</button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -384,7 +405,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <label for="categorie">Catégorie:</label>
                             <select id="categorie" name="categorie" required>
                                 <?php foreach ($categories as $categorie): ?>
-                                    <option value="<?php echo htmlspecialchars($categorie); ?>"><?php echo htmlspecialchars($categorie); ?></option>
+                                    <option value="<?php echo isset($categorie) ? htmlspecialchars($categorie) : ''; ?>"><?php echo isset($categorie) ? htmlspecialchars($categorie) : ''; ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -392,7 +413,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <label for="tags">Tags:</label>
                             <select id="tags" name="tags[]" multiple required>
                                 <?php foreach ($tags as $tag): ?>
-                                    <option value="<?php echo htmlspecialchars($tag); ?>"><?php echo htmlspecialchars($tag); ?></option>
+                                    <option value="<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['nom_tag']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -443,7 +464,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <label for="edit_categorie">Catégorie:</label>
                     <select id="edit_categorie" name="categorie" required>
                         <?php foreach ($categories as $categorie): ?>
-                            <option value="<?php echo htmlspecialchars($categorie); ?>"><?php echo htmlspecialchars($categorie); ?></option>
+                            <option value="<?php echo isset($categorie) ? htmlspecialchars($categorie) : ''; ?>"><?php echo isset($categorie) ? htmlspecialchars($categorie) : ''; ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -451,7 +472,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <label for="edit_tags">Tags:</label>
                     <select id="edit_tags" name="tags[]" multiple required>
                         <?php foreach ($tags as $tag): ?>
-                            <option value="<?php echo htmlspecialchars($tag); ?>"><?php echo htmlspecialchars($tag); ?></option>
+                            <option value="<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['nom_tag']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -462,6 +483,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+        // Parse the PHP variables
+        var categories = <?php echo $categoriesJson; ?>;
+        var tags = <?php echo $tagsJson; ?>;
+
         $(document).ready(function() {
             toggleFormatFields();
             toggleEditFormatFields();
@@ -554,7 +579,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $('#edit_duree_minutes').val(course.duree_minutes);
             }
 
-            $('#edit_tags').val(course.tags ? course.tags.split(', ') : []);
+            // Update this part to handle tag IDs
+            var courseTags = course.tags ? course.tags.split(',') : [];
+            $('#edit_tags').val(courseTags);
             
             $('#editModal').show();
             toggleEditFormatFields();
@@ -637,11 +664,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         showMessage("<?php echo addslashes($message); ?>", <?php echo $message === "Cours ajouté avec succès" || $message === "Cours modifié avec succès" || $message === "Cours supprimé avec succès" || $message === "Inscription supprimée avec succès" ? 'true' : 'false'; ?>);
         <?php endif; ?>
     </script>
-    <?php
-        function logError($message) {
-            error_log(date('[Y-m-d H:i:s] ') . $message . "\n", 3, '../../logs/error.log');
-        }
-    ?>
 </body>
 </html>
 

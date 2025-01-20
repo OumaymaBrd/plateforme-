@@ -1,5 +1,5 @@
 <?php
-class Cours {
+abstract class Cours {
     protected $conn;
     protected $table_name = "cours";
 
@@ -8,7 +8,6 @@ class Cours {
     public $description;
     public $type;
     public $format;
-    public $tags;
     public $categorie;
     public $matricule_enseignant;
     public $file_path;
@@ -19,11 +18,17 @@ class Cours {
     public function __construct($db) {
         $this->conn = $db;
     }
-   
+
+    abstract public function ajouterCours();
+    abstract public function modifierCours();
+
     public function getCoursesForEnseignant($matricule) {
-        $query = "SELECT * FROM " . $this->table_name . "
-              WHERE matricule_enseignant = :matricule AND supprime = 0 
-              ORDER BY id DESC";
+        $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM " . $this->table_name . " c
+              LEFT JOIN tags_courses tc ON c.id = tc.id_cours
+              LEFT JOIN tags t ON tc.id_tags = t.id
+              WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
+              GROUP BY c.id
+              ORDER BY c.id DESC";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':matricule', $matricule);
         $stmt->execute();
@@ -38,23 +43,10 @@ class Cours {
     }
 
     public function getTags() {
-        $query = "SELECT DISTINCT TRIM(tag) as tag FROM (
-                    SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(tags, ',', n.n), ',', -1) as tag
-                    FROM " . $this->table_name . "
-                    CROSS JOIN (
-                        SELECT a.N + b.N * 10 + 1 n
-                        FROM (SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a
-                        CROSS JOIN (SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) b
-                        ORDER BY n
-                    ) n
-                    WHERE n.n <= 1 + (LENGTH(tags) - LENGTH(REPLACE(tags, ',', '')))
-                    AND supprime = 0
-                ) as subquery
-                WHERE tag != ''
-                ORDER BY tag";
+        $query = "SELECT id, nom_tag FROM tags ORDER BY nom_tag";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getEnrolledCourses($matricule_enseignant) {
@@ -119,7 +111,6 @@ class Cours {
             $this->description = $row['description'];
             $this->type = $row['type'];
             $this->format = $row['format'];
-            $this->tags = $row['tags'];
             $this->categorie = $row['categorie'];
             $this->matricule_enseignant = $row['matricule_enseignant'];
             $this->file_path = $row['file_path'];
@@ -147,8 +138,5 @@ class Cours {
         
         return $stmt->execute();
     }
-
-    // abstract function ajouterCours();
-    // abstract function modifierCours();
 }
 
