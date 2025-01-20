@@ -11,10 +11,10 @@ ini_set('display_errors', 1);
 session_start();
 require_once '../../db/Database.php';
 require_once '../../models/user.php';
-require_once '../../models/Cours.php';
+require_once '../../models/cours.php';
 require_once '../../models/document.php';
 require_once '../../models/coursvideos.php';
-require_once '../../models/Tags_courses.php';
+require_once '../../models/tags_courses.php';
 
 // Vérification de l'authentification et des autorisations
 if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $_SESSION['user_status'] !== 'accepter') {
@@ -31,14 +31,12 @@ $user = new User($db);
 $user->id = $_SESSION['user_id'];
 $user->matricule = $_SESSION['user_matricule'];
 
-// Instead of instantiating Cours directly, we'll use it for static method calls
-$coursHelper = new CoursDocument($db); // Using CoursDocument as a helper, but we could use CoursVideo too
 $tags_courses = new Tags_courses($db);
 
-$courses = $coursHelper->getCoursesForEnseignant($matricule);
+$courses = Cours::getCoursesForEnseignant($db, $matricule);
 
-$categories = $coursHelper->getCategories();
-$tags = $coursHelper->getTags();
+$categories = Cours::getCategories($db);
+$tags = Cours::getTags($db);
 
 // Convert categories and tags to JSON for use in JavaScript
 $categoriesJson = json_encode($categories);
@@ -47,11 +45,11 @@ $tagsJson = json_encode($tags);
 $message = '';
 
 // Fetch course enrollments
-$enrollments = $coursHelper->getEnrolledCourses($matricule);
+$enrollments = Cours::getEnrolledCourses($db, $matricule);
 
 // Fetch statistics
-$enrolledStudentsCount = $coursHelper->getEnrolledStudentsCount($matricule);
-$coursesCount = $coursHelper->getCoursesCount($matricule);
+$enrolledStudentsCount = Cours::getEnrolledStudentsCount($db, $matricule);
+$coursesCount = Cours::getCoursesCount($db, $matricule);
 
 // Fonction pour gérer l'upload de fichier
 function handleFileUpload($file, $allowedExtensions) {
@@ -82,24 +80,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $format = $_POST['format'];
     $newCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
 
-    $newCours->titre = $_POST['titre'];
-    $newCours->description = $_POST['description'];
-    $newCours->format = $format;
-    $newCours->categorie = $_POST['categorie'];
-    $newCours->matricule_enseignant = $matricule;
+    $newCours->setTitre($_POST['titre']);
+    $newCours->setDescription($_POST['description']);
+    $newCours->setFormat($format);
+    $newCours->setCategorie($_POST['categorie']);
+    $newCours->setMatriculeEnseignant($matricule);
 
     if ($format === 'pdf' || $format === 'txt') {
-        $newCours->nombre_pages = $_POST['nombre_pages'];
+        $newCours->setNombrePages($_POST['nombre_pages']);
         $allowedExtensions = ['pdf', 'txt'];
     } else {
-        $newCours->duree_minutes = $_POST['duree_minutes'];
+        $newCours->setDureeMinutes($_POST['duree_minutes']);
         $allowedExtensions = ['mp4'];
     }
 
     if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
         list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
         if ($uploadSuccess) {
-            $newCours->file_path = $uploadResult;
+            $newCours->setFilePath($uploadResult);
         } else {
             $message = $uploadResult;
         }
@@ -109,13 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (empty($message)) {
         if ($newCours->ajouterCours()) {
-            $coursId = $newCours->id;
-            $tags_courses = new Tags_courses($db);
+            $coursId = $db->lastInsertId();
             foreach ($_POST['tags'] as $tagId) {
                 $tags_courses->addTagToCourse($coursId, $tagId);
             }
             $message = "Cours ajouté avec succès";
-            $courses = $coursHelper->getCoursesForEnseignant($matricule); // Refresh the course list
+            $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
         } else {
             $message = "Erreur lors de l'ajout du cours";
         }
@@ -141,23 +138,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $format = $_POST['format'];
     $editCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
 
-    $editCours->id = $_POST['id'];
-    $editCours->titre = $_POST['titre'];
-    $editCours->description = $_POST['description'];
-    $editCours->format = $format;
-    $editCours->categorie = $_POST['categorie'];
-    $editCours->tags = implode(', ', $_POST['tags']);
-
-    // Récupérer les informations existantes du cours
-    $existingCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
-    $existingCours->id = $_POST['id'];
-    $existingCours->getCoursById();
+    $editCours->getCoursById($_POST['id']);
+    $editCours->setTitre($_POST['titre']);
+    $editCours->setDescription($_POST['description']);
+    $editCours->setFormat($format);
+    $editCours->setCategorie($_POST['categorie']);
 
     if ($format === 'pdf' || $format === 'txt') {
-        $editCours->nombre_pages = $_POST['nombre_pages'];
+        $editCours->setNombrePages($_POST['nombre_pages']);
         $allowedExtensions = ['pdf', 'txt'];
     } else {
-        $editCours->duree_minutes = $_POST['duree_minutes'];
+        $editCours->setDureeMinutes($_POST['duree_minutes']);
         $allowedExtensions = ['mp4'];
     }
 
@@ -165,30 +156,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
         list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
         if ($uploadSuccess) {
-            $editCours->file_path = $uploadResult;
+            $editCours->setFilePath($uploadResult);
             // Supprimer l'ancien fichier si un nouveau est uploadé
-            if (file_exists($existingCours->file_path)) {
-                unlink($existingCours->file_path);
+            if (file_exists($editCours->getFilePath())) {
+                unlink($editCours->getFilePath());
             }
         } else {
             $message = $uploadResult;
         }
-    } else {
-        // Conserver l'ancien chemin de fichier si aucun nouveau fichier n'est uploadé
-        $editCours->file_path = $existingCours->file_path;
     }
-
-    $editCours->matricule_enseignant = $existingCours->matricule_enseignant;
 
     if (empty($message)) {
         if ($editCours->modifierCours()) {
-            $tags_courses = new Tags_courses($db);
-            $tags_courses->removeTagsFromCourse($editCours->id);
+            $tags_courses->removeTagsFromCourse($_POST['id']);
             foreach ($_POST['tags'] as $tagId) {
-                $tags_courses->addTagToCourse($editCours->id, $tagId);
+                $tags_courses->addTagToCourse($_POST['id'], $tagId);
             }
             $message = "Cours modifié avec succès";
-            $courses = $coursHelper->getCoursesForEnseignant($matricule); // Refresh the course list
+            $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
         } else {
             $message = "Erreur lors de la modification du cours";
         }
@@ -212,11 +197,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Traitement de la suppression d'un cours
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_course') {
     $deleteCours = new CoursDocument($db); // We can use either CoursDocument or CoursVideo here
-    $deleteCours->id = $_POST['id'];
+    $deleteCours->getCoursById($_POST['id']);
 
     if ($deleteCours->supprimerCours()) {
         $message = "Cours supprimé avec succès";
-        $courses = $coursHelper->getCoursesForEnseignant($matricule); // Refresh the course list
+        $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
     } else {
         $message = "Erreur lors de la suppression du cours";
     }
@@ -241,9 +226,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $matricule_etudiant = $_POST['matricule_etudiant'];
     $titre_cours = $_POST['titre_cours'];
 
-    if ($coursHelper->supprimerInscription($matricule_etudiant, $titre_cours)) {
+    if (Cours::supprimerInscription($db, $matricule_etudiant, $titre_cours)) {
         $message = "Inscription supprimée avec succès";
-        $enrollments = $coursHelper->getEnrolledCourses($matricule); // Refresh the enrollments list
+        $enrollments = Cours::getEnrolledCourses($db, $matricule); // Refresh the enrollments list
     } else {
         $message = "Erreur lors de la suppression de l'inscription";
     }

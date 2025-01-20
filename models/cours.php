@@ -86,11 +86,11 @@ abstract class Cours {
 
     public static function getCoursesForEnseignant($db, $matricule) {
         $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM cours c
-                  LEFT JOIN tags_courses tc ON c.id = tc.id_cours
+                  LEFT JOIN tags_courses tc ON c.titre = tc.titre_cours
                   LEFT JOIN tags t ON tc.id_tags = t.id
                   WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
-                  GROUP BY c.id
-                  ORDER BY c.id DESC";
+                  GROUP BY c.titre
+                  ORDER BY c.titre DESC";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':matricule', $matricule);
         $stmt->execute();
@@ -160,10 +160,10 @@ abstract class Cours {
         return $stmt->execute();
     }
 
-    public function getCoursById($id) {
-        $query = "SELECT * FROM " . $this->table_name . " WHERE id = :id";
+    public function getCoursByTitre($titre) {
+        $query = "SELECT * FROM " . $this->table_name . " WHERE titre = :titre";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':titre', $titre);
         $stmt->execute();
         
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
