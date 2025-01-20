@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($newCours->ajouterCours()) {
             $coursId = $db->lastInsertId();
             foreach ($_POST['tags'] as $tagId) {
-                $tags_courses->addTagToCourse($coursId, $tagId);
+                $tags_courses->addTagToCourse($newCours->getTitre(), $tagId);
             }
             $message = "Cours ajouté avec succès";
             $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
@@ -138,8 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $format = $_POST['format'];
     $editCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
 
-    $editCours->getCoursById($_POST['id']);
-    $editCours->setTitre($_POST['titre']);
+    $editCours->getCoursByTitre($_POST['titre']);
     $editCours->setDescription($_POST['description']);
     $editCours->setFormat($format);
     $editCours->setCategorie($_POST['categorie']);
@@ -168,9 +167,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (empty($message)) {
         if ($editCours->modifierCours()) {
-            $tags_courses->removeTagsFromCourse($_POST['id']);
+            $tags_courses->removeTagsFromCourse($editCours->getTitre());
             foreach ($_POST['tags'] as $tagId) {
-                $tags_courses->addTagToCourse($_POST['id'], $tagId);
+                $tags_courses->addTagToCourse($editCours->getTitre(), $tagId);
             }
             $message = "Cours modifié avec succès";
             $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
@@ -197,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Traitement de la suppression d'un cours
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_course') {
     $deleteCours = new CoursDocument($db); // We can use either CoursDocument or CoursVideo here
-    $deleteCours->getCoursById($_POST['id']);
+    $deleteCours->getCoursByTitre($_POST['titre']);
 
     if ($deleteCours->supprimerCours()) {
         $message = "Cours supprimé avec succès";
@@ -309,7 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     <td><?php echo isset($course['tags']) ? htmlspecialchars($course['tags']) : ''; ?></td>
                                     <td>
                                         <button class="btn" onclick="openEditModal(<?php echo htmlspecialchars(json_encode($course)); ?>)">Modifier</button>
-                                        <button class="btn" onclick="deleteCourse(<?php echo $course['id']; ?>)">Supprimer</button>
+                                        <button class="btn" onclick="deleteCourse('<?php echo htmlspecialchars($course['titre']); ?>')">Supprimer</button>
                                         <a href="<?php echo isset($course['file_path']) ? htmlspecialchars($course['file_path']) : ''; ?>" target="_blank" class="btn">Afficher</a>
                                     </td>
                                 </tr>
@@ -322,6 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <div id="enrollments" class="tab-content">
                 <div class="card">
                     <h2>Liste des inscriptions</h2>
+                
                     <?php if (empty($enrollments)): ?>
                         <p>Aucune inscription aux cours pour le moment.</p>
                     <?php else: ?>
@@ -416,11 +416,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <h2>Modifier le cours</h2>
             <form id="editCourseForm" action="" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="edit_course">
-                <input type="hidden" id="edit_id" name="id">
-                <div class="form-group">
-                    <label for="edit_titre">Titre du cours:</label>
-                    <input type="text" id="edit_titre" name="titre" required>
-                </div>
+                <input type="hidden" id="edit_titre" name="titre">
                 <div class="form-group">
                     <label for="edit_description">Description:</label>
                     <textarea id="edit_description" name="description" required></textarea>
@@ -552,7 +548,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         function openEditModal(course) {
-            $('#edit_id').val(course.id);
             $('#edit_titre').val(course.titre);
             $('#edit_description').val(course.description);
             $('#edit_format').val(course.format).change();
@@ -572,12 +567,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             toggleEditFormatFields();
         }
 
-        function deleteCourse(id) {
+        function deleteCourse(titre) {
             if (confirm('Êtes-vous sûr de vouloir supprimer ce cours ?')) {
                 $.ajax({
                     url: '',
                     type: 'POST',
-                    data: { action: 'delete_course', id: id },
+                    data: { action: 'delete_course', titre: titre },
                     success: function(response) {
                         try {
                             var jsonResponse = JSON.parse(response);

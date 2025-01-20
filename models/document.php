@@ -1,5 +1,5 @@
 <?php
-require_once 'Cours.php';
+require_once 'cours.php';
 
 class CoursDocument extends Cours {
     protected $nombre_pages;
