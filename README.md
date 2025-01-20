@@ -63,7 +63,7 @@ Le dossier `uploads/` stocke tous les fichiers uploadés par les utilisateurs (d
 ## 🛠️ Configuration Requise
 
 - PHP 8.2.13
-- MySQL 
+- MySQL 8.2.0
 - Serveur Web (Apache/Nginx)
 - Extensions PHP requises:
   - PDO
