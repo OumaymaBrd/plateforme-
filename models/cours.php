@@ -19,7 +19,7 @@ class Cours {
     public function __construct($db) {
         $this->conn = $db;
     }
-
+   
     public function getCoursesForEnseignant($matricule) {
         $query = "SELECT * FROM " . $this->table_name . "
               WHERE matricule_enseignant = :matricule AND supprime = 0 
@@ -147,5 +147,8 @@ class Cours {
         
         return $stmt->execute();
     }
+
+    // abstract function ajouterCours();
+    // abstract function modifierCours();
 }
 

@@ -48,8 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="assets/style/style.css" rel="stylesheet">
 </head>
 <body>
-    
-
     <section class="container">
         <div class="login-container">
             <div class="circle circle-one"></div>
