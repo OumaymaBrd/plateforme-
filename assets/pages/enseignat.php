@@ -11,10 +11,10 @@ ini_set('display_errors', 1);
 session_start();
 require_once '../../db/Database.php';
 require_once '../../models/user.php';
-require_once '../../models/Cours.php';
-require_once '../../models/CoursDocument.php';
-require_once '../../models/CoursVideo.php';
-require_once '../../models/Tags_courses.php';
+require_once '../../models/cours.php';
+require_once '../../models/document.php';
+require_once '../../models/coursvideos.php';
+require_once '../../models/tags_courses.php';
 
 // Vérification de l'authentification et des autorisations
 if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $_SESSION['user_status'] !== 'accepter') {

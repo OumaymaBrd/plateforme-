@@ -1,5 +1,5 @@
 <?php
-require_once 'Cours.php';
+require_once 'cours.php';
 
 class CoursVideo extends Cours {
     public function __construct($db) {
