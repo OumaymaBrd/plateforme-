@@ -3,53 +3,115 @@ abstract class Cours {
     protected $conn;
     protected $table_name = "cours";
 
-    public $id;
-    public $titre;
-    public $description;
-    public $type;
-    public $format;
-    public $categorie;
-    public $matricule_enseignant;
-    public $file_path;
-    public $supprime;
-    public $nombre_pages;
-    public $duree_minutes;
+    protected $titre;
+    protected $description;
+    protected $type;
+    protected $format;
+    protected $categorie;
+    protected $matricule_enseignant;
+    protected $file_path;
+    protected $supprime;
 
     public function __construct($db) {
         $this->conn = $db;
     }
 
+    // Getters and Setters
+    public function getTitre() {
+        return $this->titre;
+    }
+
+    public function setTitre($titre) {
+        $this->titre = $titre;
+    }
+
+    public function getDescription() {
+        return $this->description;
+    }
+
+    public function setDescription($description) {
+        $this->description = $description;
+    }
+
+    public function getType() {
+        return $this->type;
+    }
+
+    public function setType($type) {
+        $this->type = $type;
+    }
+
+    public function getFormat() {
+        return $this->format;
+    }
+
+    public function setFormat($format) {
+        $this->format = $format;
+    }
+
+    public function getCategorie() {
+        return $this->categorie;
+    }
+
+    public function setCategorie($categorie) {
+        $this->categorie = $categorie;
+    }
+
+    public function getMatriculeEnseignant() {
+        return $this->matricule_enseignant;
+    }
+
+    public function setMatriculeEnseignant($matricule_enseignant) {
+        $this->matricule_enseignant = $matricule_enseignant;
+    }
+
+    public function getFilePath() {
+        return $this->file_path;
+    }
+
+    public function setFilePath($file_path) {
+        $this->file_path = $file_path;
+    }
+
+    public function getSupprime() {
+        return $this->supprime;
+    }
+
+    public function setSupprime($supprime) {
+        $this->supprime = $supprime;
+    }
+
     abstract public function ajouterCours();
     abstract public function modifierCours();
 
-    public function getCoursesForEnseignant($matricule) {
-        $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM " . $this->table_name . " c
-              LEFT JOIN tags_courses tc ON c.id = tc.id_cours
-              LEFT JOIN tags t ON tc.id_tags = t.id
-              WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
-              GROUP BY c.id
-              ORDER BY c.id DESC";
-        $stmt = $this->conn->prepare($query);
+    public static function getCoursesForEnseignant($db, $matricule) {
+        $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM cours c
+                  LEFT JOIN tags_courses tc ON c.id = tc.id_cours
+                  LEFT JOIN tags t ON tc.id_tags = t.id
+                  WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
+                  GROUP BY c.id
+                  ORDER BY c.id DESC";
+        $stmt = $db->prepare($query);
         $stmt->bindParam(':matricule', $matricule);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getCategories() {
-        $query = "SELECT DISTINCT categorie FROM " . $this->table_name . " WHERE supprime = 0 ORDER BY categorie";
-        $stmt = $this->conn->prepare($query);
+    public static function getCategories($db) {
+        $query = "SELECT DISTINCT categorie FROM cours WHERE supprime = 0 ORDER BY categorie";
+        $stmt = $db->prepare($query);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    public function getTags() {
+    public static function getTags($db) {
         $query = "SELECT id, nom_tag FROM tags ORDER BY nom_tag";
-        $stmt = $this->conn->prepare($query);
+        $stmt = $db->prepare($query);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getEnrolledCourses($matricule_enseignant) {
+    public static function getEnrolledCourses($db, $matricule_enseignant) {
         $query = "SELECT u.nom, u.prenom, ic.titre_cours, u.matricule as matricule_etudiant
                   FROM inscris_cours ic
                   JOIN cours c ON ic.titre_cours = c.titre
@@ -57,20 +119,20 @@ abstract class Cours {
                   WHERE c.matricule_enseignant = :matricule_enseignant AND c.supprime = 0
                   ORDER BY c.titre, u.nom, u.prenom";
         
-        $stmt = $this->conn->prepare($query);
+        $stmt = $db->prepare($query);
         $stmt->bindParam(':matricule_enseignant', $matricule_enseignant);
         $stmt->execute();
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getEnrolledStudentsCount($matricule_enseignant) {
+    public static function getEnrolledStudentsCount($db, $matricule_enseignant) {
         $query = "SELECT COUNT(DISTINCT ic.matricule_etudiant) as count
                   FROM inscris_cours ic
                   JOIN cours c ON ic.titre_cours = c.titre
                   WHERE c.matricule_enseignant = :matricule_enseignant AND c.supprime = 0";
         
-        $stmt = $this->conn->prepare($query);
+        $stmt = $db->prepare($query);
         $stmt->bindParam(':matricule_enseignant', $matricule_enseignant);
         $stmt->execute();
         
@@ -78,12 +140,12 @@ abstract class Cours {
         return $result['count'];
     }
 
-    public function getCoursesCount($matricule_enseignant) {
+    public static function getCoursesCount($db, $matricule_enseignant) {
         $query = "SELECT COUNT(*) as count
-                  FROM " . $this->table_name . "
+                  FROM cours
                   WHERE matricule_enseignant = :matricule_enseignant AND supprime = 0";
         
-        $stmt = $this->conn->prepare($query);
+        $stmt = $db->prepare($query);
         $stmt->bindParam(':matricule_enseignant', $matricule_enseignant);
         $stmt->execute();
         
@@ -92,31 +154,29 @@ abstract class Cours {
     }
 
     public function supprimerCours() {
-        $query = "UPDATE " . $this->table_name . " SET supprime = 1 WHERE id = :id";
+        $query = "UPDATE " . $this->table_name . " SET supprime = 1 WHERE titre = :titre";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":id", $this->id);
+        $stmt->bindParam(":titre", $this->titre);
         return $stmt->execute();
     }
 
-    public function getCoursById() {
+    public function getCoursById($id) {
         $query = "SELECT * FROM " . $this->table_name . " WHERE id = :id";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $this->id);
+        $stmt->bindParam(':id', $id);
         $stmt->execute();
         
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($row) {
-            $this->titre = $row['titre'];
-            $this->description = $row['description'];
-            $this->type = $row['type'];
-            $this->format = $row['format'];
-            $this->categorie = $row['categorie'];
-            $this->matricule_enseignant = $row['matricule_enseignant'];
-            $this->file_path = $row['file_path'];
-            $this->supprime = $row['supprime'];
-            $this->nombre_pages = $row['nombre_pages'];
-            $this->duree_minutes = $row['duree_minutes'];
+            $this->setTitre($row['titre']);
+            $this->setDescription($row['description']);
+            $this->setType($row['type']);
+            $this->setFormat($row['format']);
+            $this->setCategorie($row['categorie']);
+            $this->setMatriculeEnseignant($row['matricule_enseignant']);
+            $this->setFilePath($row['file_path']);
+            $this->setSupprime($row['supprime']);
             return true;
         }
         
@@ -127,12 +187,12 @@ abstract class Cours {
         return htmlspecialchars(strip_tags($input));
     }
 
-    public function supprimerInscription($matricule_etudiant, $titre_cours) {
+    public static function supprimerInscription($db, $matricule_etudiant, $titre_cours) {
         $query = "DELETE FROM inscris_cours 
                   WHERE matricule_etudiant = :matricule_etudiant 
                   AND titre_cours = :titre_cours";
         
-        $stmt = $this->conn->prepare($query);
+        $stmt = $db->prepare($query);
         $stmt->bindParam(':matricule_etudiant', $matricule_etudiant);
         $stmt->bindParam(':titre_cours', $titre_cours);
         
