@@ -1,5 +1,5 @@
 <?php
-require_once 'cours.php';
+require_once 'Cours.php';
 
 class CoursDocument extends Cours {
     protected $nombre_pages;
@@ -25,20 +25,20 @@ class CoursDocument extends Cours {
 
         $stmt = $this->conn->prepare($query);
 
-        $this->titre = $this->sanitizeInput($this->titre);
-        $this->description = $this->sanitizeInput($this->description);
-        $this->format = $this->sanitizeInput($this->format);
-        $this->categorie = $this->sanitizeInput($this->categorie);
-        $this->file_path = $this->sanitizeInput($this->file_path);
+        $titre = $this->sanitizeInput($this->getTitre());
+        $description = $this->sanitizeInput($this->getDescription());
+        $format = $this->sanitizeInput($this->getFormat());
+        $categorie = $this->sanitizeInput($this->getCategorie());
+        $file_path = $this->sanitizeInput($this->getFilePath());
 
-        $stmt->bindParam(":titre", $this->titre);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":type", $this->type);
-        $stmt->bindParam(":format", $this->format);
-        $stmt->bindParam(":categorie", $this->categorie);
-        $stmt->bindParam(":matricule_enseignant", $this->matricule_enseignant);
-        $stmt->bindParam(":file_path", $this->file_path);
-        $stmt->bindParam(":nombre_pages", $this->nombre_pages);
+        $stmt->bindParam(":titre", $titre);
+        $stmt->bindParam(":description", $description);
+        $stmt->bindParam(":type", $this->getType());
+        $stmt->bindParam(":format", $format);
+        $stmt->bindParam(":categorie", $categorie);
+        $stmt->bindParam(":matricule_enseignant", $this->getMatriculeEnseignant());
+        $stmt->bindParam(":file_path", $file_path);
+        $stmt->bindParam(":nombre_pages", $this->getNombrePages());
 
         if($stmt->execute()) {
             return true;
@@ -48,25 +48,24 @@ class CoursDocument extends Cours {
 
     public function modifierCours() {
         $query = "UPDATE " . $this->table_name . "
-                  SET titre = :titre, description = :description, format = :format, 
+                  SET description = :description, format = :format, 
                       categorie = :categorie, file_path = :file_path, nombre_pages = :nombre_pages
-                  WHERE titre = :titre_original";
+                  WHERE titre = :titre";
 
         $stmt = $this->conn->prepare($query);
 
-        $this->titre = $this->sanitizeInput($this->titre);
-        $this->description = $this->sanitizeInput($this->description);
-        $this->format = $this->sanitizeInput($this->format);
-        $this->categorie = $this->sanitizeInput($this->categorie);
-        $this->file_path = $this->sanitizeInput($this->file_path);
+        $titre = $this->sanitizeInput($this->getTitre());
+        $description = $this->sanitizeInput($this->getDescription());
+        $format = $this->sanitizeInput($this->getFormat());
+        $categorie = $this->sanitizeInput($this->getCategorie());
+        $file_path = $this->sanitizeInput($this->getFilePath());
 
-        $stmt->bindParam(":titre", $this->titre);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":format", $this->format);
-        $stmt->bindParam(":categorie", $this->categorie);
-        $stmt->bindParam(":file_path", $this->file_path);
-        $stmt->bindParam(":nombre_pages", $this->nombre_pages);
-        $stmt->bindParam(":titre_original", $this->titre);
+        $stmt->bindParam(":titre", $titre);
+        $stmt->bindParam(":description", $description);
+        $stmt->bindParam(":format", $format);
+        $stmt->bindParam(":categorie", $categorie);
+        $stmt->bindParam(":file_path", $file_path);
+        $stmt->bindParam(":nombre_pages", $this->getNombrePages());
 
         if($stmt->execute()) {
             return true;
