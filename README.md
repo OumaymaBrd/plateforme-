@@ -75,7 +75,7 @@ Le dossier `uploads/` stocke tous les fichiers uploadés par les utilisateurs (d
 
 1. Clonez le dépôt
 ```bash
-git clone https://github.com/votre-username/youdemy.git
+git clone https://github.com/OumaymaBrd/plateforme-
 ```
 
 2. Configurez votre base de données dans `db/config.php`
