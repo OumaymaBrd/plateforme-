@@ -33,7 +33,13 @@ $user->matricule = $_SESSION['user_matricule'];
 
 $tags_courses = new Tags_courses($db);
 
-$courses = Cours::getCoursesForEnseignant($db, $matricule);
+try {
+    $courses = Cours::getCoursesForEnseignant($db, $matricule);
+} catch (PDOException $e) {
+    error_log("Error fetching courses: " . $e->getMessage());
+    $courses = []; // Set courses to an empty array if there's an error
+    $message = "Une erreur s'est produite lors de la récupération des cours. Veuillez réessayer plus tard.";
+}
 
 $categories = Cours::getCategories($db);
 $tags = Cours::getTags($db);

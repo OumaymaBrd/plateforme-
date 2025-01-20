@@ -139,17 +139,24 @@ abstract class Cours {
     }
 
     public static function getCoursesForEnseignant($db, $matricule) {
-        $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM cours c
-                  LEFT JOIN tags_courses tc ON c.titre = tc.titre_cours
-                  LEFT JOIN tags t ON tc.id_tags = t.id
-                  WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
-                  GROUP BY c.titre
-                  ORDER BY c.titre DESC";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':matricule', $matricule);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM cours c
+                      LEFT JOIN tags_courses tc ON c.titre = tc.titre_cours
+                      LEFT JOIN tags t ON tc.id_tags = t.id
+                      WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
+                      GROUP BY c.titre
+                      ORDER BY c.titre DESC";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':matricule', $matricule);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error in getCoursesForEnseignant: " . $e->getMessage());
+            throw $e; // Re-throw the exception after logging
+        }
     }
+    
+    
 
     public static function getCategories($db) {
         $query = "SELECT DISTINCT categorie FROM cours WHERE supprime = 0 ORDER BY categorie";
