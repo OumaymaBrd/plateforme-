@@ -11,10 +11,10 @@ ini_set('display_errors', 1);
 session_start();
 require_once '../../db/Database.php';
 require_once '../../models/user.php';
-require_once '../../models/cours.php';
-require_once '../../models/document.php';
-require_once '../../models/coursvideos.php';
-require_once '../../models/tags_courses.php';
+require_once '../../models/Cours.php';
+require_once '../../models/CoursDocument.php';
+require_once '../../models/CoursVideo.php';
+require_once '../../models/Tags_courses.php';
 
 // Vérification de l'authentification et des autorisations
 if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $_SESSION['user_status'] !== 'accepter') {
@@ -33,29 +33,29 @@ $user->matricule = $_SESSION['user_matricule'];
 
 $tags_courses = new Tags_courses($db);
 
+$message = '';
+$courses = [];
+$categories = [];
+$tags = [];
+$enrollments = [];
+$enrolledStudentsCount = 0;
+$coursesCount = 0;
+
 try {
     $courses = Cours::getCoursesForEnseignant($db, $matricule);
+    $categories = Cours::getCategories($db);
+    $tags = Cours::getTags($db);
+    $enrollments = Cours::getEnrolledCourses($db, $matricule);
+    $enrolledStudentsCount = Cours::getEnrolledStudentsCount($db, $matricule);
+    $coursesCount = Cours::getCoursesCount($db, $matricule);
 } catch (PDOException $e) {
-    error_log("Error fetching courses: " . $e->getMessage());
-    $courses = []; // Set courses to an empty array if there's an error
-    $message = "Une erreur s'est produite lors de la récupération des cours. Veuillez réessayer plus tard.";
+    error_log("Error fetching data: " . $e->getMessage());
+    $message = "Une erreur s'est produite lors de la récupération des données. Veuillez réessayer plus tard.";
 }
-
-$categories = Cours::getCategories($db);
-$tags = Cours::getTags($db);
 
 // Convert categories and tags to JSON for use in JavaScript
 $categoriesJson = json_encode($categories);
 $tagsJson = json_encode($tags);
-
-$message = '';
-
-// Fetch course enrollments
-$enrollments = Cours::getEnrolledCourses($db, $matricule);
-
-// Fetch statistics
-$enrolledStudentsCount = Cours::getEnrolledStudentsCount($db, $matricule);
-$coursesCount = Cours::getCoursesCount($db, $matricule);
 
 // Fonction pour gérer l'upload de fichier
 function handleFileUpload($file, $allowedExtensions) {
@@ -112,28 +112,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 
     if (empty($message)) {
-        if ($newCours->ajouterCours()) {
-            foreach ($_POST['tags'] as $tagId) {
-                $tags_courses->addTagToCourse($newCours->getTitre(), $tagId);
+        try {
+            if ($newCours->ajouterCours()) {
+                foreach ($_POST['tags'] as $tagId) {
+                    $tags_courses->addTagToCourse($newCours->getId(), $tagId);
+                }
+                $message = "Cours ajouté avec succès";
+                $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+            } else {
+                $message = "Erreur lors de l'ajout du cours";
             }
-            $message = "Cours ajouté avec succès";
-            $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
-        } else {
-            $message = "Erreur lors de l'ajout du cours";
+        } catch (PDOException $e) {
+            error_log("Error adding course: " . $e->getMessage());
+            $message = "Une erreur s'est produite lors de l'ajout du cours. Veuillez réessayer.";
         }
     }
 
     // Répondre avec un JSON pour les requêtes AJAX
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-        try {
-            // Assurez-vous que toute sortie précédente est effacée
-            ob_clean();
-            
-            echo json_encode(['success' => ($message === "Cours ajouté avec succès"), 'message' => $message]);
-        } catch (Exception $e) {
-            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
-        }
+        echo json_encode(['success' => ($message === "Cours ajouté avec succès"), 'message' => $message]);
         exit;
     }
 }
@@ -173,30 +170,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         if (empty($message)) {
-            if ($editCours->modifierCours()) {
-                $tags_courses->removeTagsFromCourse($editCours->getTitre());
-                foreach ($_POST['tags'] as $tagId) {
-                    $tags_courses->addTagToCourse($editCours->getTitre(), $tagId);
+            try {
+                if ($editCours->modifierCours()) {
+                    $tags_courses->removeTagsFromCourse($editCours->getId());
+                    foreach ($_POST['tags'] as $tagId) {
+                        $tags_courses->addTagToCourse($editCours->getId(), $tagId);
+                    }
+                    $message = "Cours modifié avec succès";
+                    $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+                } else {
+                    $message = "Erreur lors de la modification du cours";
                 }
-                $message = "Cours modifié avec succès";
-                $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
-            } else {
-                $message = "Erreur lors de la modification du cours";
+            } catch (PDOException $e) {
+                error_log("Error modifying course: " . $e->getMessage());
+                $message = "Une erreur s'est produite lors de la modification du cours. Veuillez réessayer.";
             }
         }
     }
 
     // Répondre avec un JSON pour les requêtes AJAX
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-        try {
-            // Assurez-vous que toute sortie précédente est effacée
-            ob_clean();
-            
-            echo json_encode(['success' => ($message === "Cours modifié avec succès"), 'message' => $message]);
-        } catch (Exception $e) {
-            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
-        }
+        echo json_encode(['success' => ($message === "Cours modifié avec succès"), 'message' => $message]);
         exit;
     }
 }
@@ -204,26 +198,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Traitement de la suppression d'un cours
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_course') {
     $deleteCours = new CoursDocument($db); // We can use either CoursDocument or CoursVideo here
-    $deleteCours->getCoursByTitre($_POST['titre']);
-
-    if ($deleteCours->supprimerCours()) {
-        $message = "Cours supprimé avec succès";
-        $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+    if ($deleteCours->getCoursByTitre($_POST['titre'])) {
+        try {
+            if ($deleteCours->supprimerCours()) {
+                $message = "Cours supprimé avec succès";
+                $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+            } else {
+                $message = "Erreur lors de la suppression du cours";
+            }
+        } catch (PDOException $e) {
+            error_log("Error deleting course: " . $e->getMessage());
+            $message = "Une erreur s'est produite lors de la suppression du cours. Veuillez réessayer.";
+        }
     } else {
-        $message = "Erreur lors de la suppression du cours";
+        $message = "Erreur : Cours non trouvé";
     }
 
     // Répondre avec un JSON pour les requêtes AJAX
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-        try {
-            // Assurez-vous que toute sortie précédente est effacée
-            ob_clean();
-            
-            echo json_encode(['success' => ($message === "Cours supprimé avec succès"), 'message' => $message]);
-        } catch (Exception $e) {
-            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
-        }
+        echo json_encode(['success' => ($message === "Cours supprimé avec succès"), 'message' => $message]);
         exit;
     }
 }
@@ -233,22 +226,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $matricule_etudiant = $_POST['matricule_etudiant'];
     $titre_cours = $_POST['titre_cours'];
 
-    if (Cours::supprimerInscription($db, $matricule_etudiant, $titre_cours)) {
-        $message = "Inscription supprimée avec succès";
-        $enrollments = Cours::getEnrolledCourses($db, $matricule); // Refresh the enrollments list
-    } else {
-        $message = "Erreur lors de la suppression de l'inscription";
+    try {
+        if (Cours::supprimerInscription($db, $matricule_etudiant, $titre_cours)) {
+            $message = "Inscription supprimée avec succès";
+            $enrollments = Cours::getEnrolledCourses($db, $matricule); // Refresh the enrollments list
+        } else {
+            $message = "Erreur lors de la suppression de l'inscription";
+        }
+    } catch (PDOException $e) {
+        error_log("Error deleting enrollment: " . $e->getMessage());
+        $message = "Une erreur s'est produite lors de la suppression de l'inscription. Veuillez réessayer.";
     }
 
     // Répondre avec un JSON pour les requêtes AJAX
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-        try {
-            ob_clean();
-            echo json_encode(['success' => ($message === "Inscription supprimée avec succès"), 'message' => $message]);
-        } catch (Exception $e) {
-            error_log("Erreur lors de la génération de la réponse JSON: " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Une erreur est survenue lors du traitement de la requête."]);
-        }
+        echo json_encode(['success' => ($message === "Inscription supprimée avec succès"), 'message' => $message]);
         exit;
     }
 }
@@ -258,7 +250,7 @@ function debug_to_console($data) {
     if (is_array($output))
         $output = implode(',', $output);
 
-    echo "<script>console.log('Debug Objects: " . $output . "' );</script>";
+    echo "<script>console.log('Debug Objects: " . addslashes($output) . "' );</script>";
 }
 
 ?>
