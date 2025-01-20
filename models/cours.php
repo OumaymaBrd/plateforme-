@@ -11,6 +11,8 @@ abstract class Cours {
     protected $matricule_enseignant;
     protected $file_path;
     protected $supprime;
+    protected $nombre_pages;
+    protected $duree_minutes;
 
     public function __construct($db) {
         $this->conn = $db;
@@ -81,8 +83,60 @@ abstract class Cours {
         $this->supprime = $supprime;
     }
 
+    public function getNombrePages() {
+        return $this->nombre_pages;
+    }
+
+    public function setNombrePages($nombre_pages) {
+        $this->nombre_pages = $nombre_pages;
+    }
+
+    public function getDureeMinutes() {
+        return $this->duree_minutes;
+    }
+
+    public function setDureeMinutes($duree_minutes) {
+        $this->duree_minutes = $duree_minutes;
+    }
+
     abstract public function ajouterCours();
-    abstract public function modifierCours();
+
+    public function modifierCours() {
+        $query = "UPDATE " . $this->table_name . "
+              SET description = :description, format = :format, 
+                  categorie = :categorie, file_path = :file_path";
+    
+        if (isset($this->nombre_pages)) {
+            $query .= ", nombre_pages = :nombre_pages";
+        } elseif (isset($this->duree_minutes)) {
+            $query .= ", duree_minutes = :duree_minutes";
+        }
+    
+        $query .= " WHERE titre = :titre";
+
+        $stmt = $this->conn->prepare($query);
+
+        $stmt->bindParam(":titre", $this->titre);
+        $stmt->bindParam(":description", $this->description);
+        $stmt->bindParam(":format", $this->format);
+        $stmt->bindParam(":categorie", $this->categorie);
+        $stmt->bindParam(":file_path", $this->file_path);
+
+        if (isset($this->nombre_pages)) {
+            $stmt->bindParam(":nombre_pages", $this->nombre_pages);
+        } elseif (isset($this->duree_minutes)) {
+            $stmt->bindParam(":duree_minutes", $this->duree_minutes);
+        }
+
+        try {
+            if($stmt->execute()) {
+                return true;
+            }
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la modification du cours : " . $e->getMessage());
+        }
+        return false;
+    }
 
     public static function getCoursesForEnseignant($db, $matricule) {
         $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags FROM cours c
@@ -177,6 +231,8 @@ abstract class Cours {
             $this->setMatriculeEnseignant($row['matricule_enseignant']);
             $this->setFilePath($row['file_path']);
             $this->setSupprime($row['supprime']);
+            $this->setNombrePages($row['nombre_pages'] ?? null);
+            $this->setDureeMinutes($row['duree_minutes'] ?? null);
             return true;
         }
         
@@ -197,6 +253,19 @@ abstract class Cours {
         $stmt->bindParam(':titre_cours', $titre_cours);
         
         return $stmt->execute();
+    }
+
+    public function getDebugInfo() {
+        return [
+            'titre' => $this->titre,
+            'description' => $this->description,
+            'type' => $this->type,
+            'format' => $this->format,
+            'categorie' => $this->categorie,
+            'file_path' => $this->file_path,
+            'nombre_pages' => $this->nombre_pages ?? null,
+            'duree_minutes' => $this->duree_minutes ?? null,
+        ];
     }
 }
 
