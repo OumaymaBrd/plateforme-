@@ -88,7 +88,7 @@ define('DB_PASS', '');
 
 3. Importez la structure de la base de données
 ```bash
-mysql -u root -p youdemy < db/structure.sql
+mysql -u root -p youdemy < 
 ```
 
 4. Configurez les permissions des dossiers
