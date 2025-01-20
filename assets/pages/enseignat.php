@@ -11,10 +11,10 @@ ini_set('display_errors', 1);
 session_start();
 require_once '../../db/Database.php';
 require_once '../../models/user.php';
-require_once '../../models/cours.php';
-require_once '../../models/document.php';
-require_once '../../models/coursvideos.php';
-require_once '../../models/tags_courses.php';
+require_once '../../models/Cours.php';
+require_once '../../models/CoursDocument.php';
+require_once '../../models/CoursVideo.php';
+require_once '../../models/Tags_courses.php';
 
 // Vérification de l'authentification et des autorisations
 if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $_SESSION['user_status'] !== 'accepter') {
@@ -107,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if (empty($message)) {
         if ($newCours->ajouterCours()) {
-            $coursId = $db->lastInsertId();
             foreach ($_POST['tags'] as $tagId) {
                 $tags_courses->addTagToCourse($newCours->getTitre(), $tagId);
             }
@@ -138,43 +137,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $format = $_POST['format'];
     $editCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
 
-    $editCours->getCoursByTitre($_POST['titre']);
-    $editCours->setDescription($_POST['description']);
-    $editCours->setFormat($format);
-    $editCours->setCategorie($_POST['categorie']);
-
-    if ($format === 'pdf' || $format === 'txt') {
-        $editCours->setNombrePages($_POST['nombre_pages']);
-        $allowedExtensions = ['pdf', 'txt'];
+    if (!$editCours->getCoursByTitre($_POST['titre'])) {
+        $message = "Erreur : Cours non trouvé";
     } else {
-        $editCours->setDureeMinutes($_POST['duree_minutes']);
-        $allowedExtensions = ['mp4'];
-    }
+        $editCours->setDescription($_POST['description']);
+        $editCours->setFormat($format);
+        $editCours->setCategorie($_POST['categorie']);
 
-    // Gestion du fichier
-    if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
-        list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
-        if ($uploadSuccess) {
-            $editCours->setFilePath($uploadResult);
-            // Supprimer l'ancien fichier si un nouveau est uploadé
-            if (file_exists($editCours->getFilePath())) {
-                unlink($editCours->getFilePath());
-            }
+        if ($format === 'pdf' || $format === 'txt') {
+            $editCours->setNombrePages($_POST['nombre_pages']);
+            $allowedExtensions = ['pdf', 'txt'];
         } else {
-            $message = $uploadResult;
+            $editCours->setDureeMinutes($_POST['duree_minutes']);
+            $allowedExtensions = ['mp4'];
         }
-    }
 
-    if (empty($message)) {
-        if ($editCours->modifierCours()) {
-            $tags_courses->removeTagsFromCourse($editCours->getTitre());
-            foreach ($_POST['tags'] as $tagId) {
-                $tags_courses->addTagToCourse($editCours->getTitre(), $tagId);
+        // Gestion du fichier
+        if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
+            list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
+            if ($uploadSuccess) {
+                // Supprimer l'ancien fichier si un nouveau est uploadé
+                if (file_exists($editCours->getFilePath())) {
+                    unlink($editCours->getFilePath());
+                }
+                $editCours->setFilePath($uploadResult);
+            } else {
+                $message = $uploadResult;
             }
-            $message = "Cours modifié avec succès";
-            $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
-        } else {
-            $message = "Erreur lors de la modification du cours";
+        }
+
+        if (empty($message)) {
+            if ($editCours->modifierCours()) {
+                $tags_courses->removeTagsFromCourse($editCours->getTitre());
+                foreach ($_POST['tags'] as $tagId) {
+                    $tags_courses->addTagToCourse($editCours->getTitre(), $tagId);
+                }
+                $message = "Cours modifié avec succès";
+                $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+            } else {
+                $message = "Erreur lors de la modification du cours";
+            }
         }
     }
 
@@ -244,6 +246,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 }
+
+function debug_to_console($data) {
+    $output = $data;
+    if (is_array($output))
+        $output = implode(',', $output);
+
+    echo "<script>console.log('Debug Objects: " . $output . "' );</script>";
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -500,16 +511,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             }
                         } catch (e) {
                             console.error("Erreur lors du parsing de la réponse JSON:", e);
+                            console.log("Réponse brute du serveur:", response);
                             showMessage("Erreur lors du traitement de la réponse du serveur. Veuillez réessayer.", false);
                         }
                     },
                     error: function(xhr, status, error) {
                         console.error("Erreur AJAX:", status, error);
-                        if (xhr.status === 413) {
-                            showMessage("Le fichier est trop volumineux. La taille maximale est de 500 Mo.", false);
-                        } else {
-                            showMessage("Une erreur s'est produite lors de la communication avec le serveur. Veuillez réessayer.", false);
-                        }
+                        console.log("Réponse du serveur:", xhr.responseText);
+                        showMessage("Une erreur s'est produite lors de la communication avec le serveur. Veuillez réessayer.", false);
                     },
                     cache: false,
                     contentType: false,
