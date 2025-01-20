@@ -62,3 +62,14 @@ CREATE TABLE inscris_cours (
     FOREIGN KEY (titre_cours) REFERENCES cours(titre)
 );
 
+--create table association 
+CREATE TABLE tags_courses(
+    id int PRIMARY KEY AUTO_INCREMENT,
+    id_cours int , 
+    id_tags int ,
+    
+     FOREIGN KEY (id_cours) REFERENCES cours(id) ,
+    FOREIGN KEY (id_tags) REFERENCES tags(id)
+    
+    );
+
