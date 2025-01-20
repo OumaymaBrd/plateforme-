@@ -78,7 +78,7 @@ Le dossier `uploads/` stocke tous les fichiers uploadés par les utilisateurs (d
 git clone https://github.com/OumaymaBrd/plateforme-
 ```
 
-2. Configurez votre base de données dans `db/config.php`
+2. Configurez votre base de données dans `db/Database.php`
 ```php
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'youdemy');
