@@ -63,16 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     <meta charset="UTF-8">
     <title>Andev Web - Login</title>
     <link rel="stylesheet" href="../style/style_index.css">
-    <style>
-        .error-message {
-            background-color: rgba(255, 0, 0, 0.1);
-            color: #ff3333;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-    </style>
+    <link rel="stylesheet" href="../style/ style_login.css"> 
 </head>
 <body>
     <section class="container">

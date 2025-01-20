@@ -61,3 +61,4 @@ CREATE TABLE inscris_cours (
     FOREIGN KEY (matricule_etudiant) REFERENCES user_(matricule),
     FOREIGN KEY (titre_cours) REFERENCES cours(titre)
 );
+
