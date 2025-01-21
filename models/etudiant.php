@@ -13,7 +13,7 @@ class Etudiant extends User {
         $offset = ($currentPage - 1) * $itemsPerPage;
         
         $query = "SELECT c.id, c.titre, c.description, c.date_creation, c.type, c.format, 
-                  c.file_path, c.nombre_pages, c.tags, c.categorie, 
+                  c.file_path, c.nombre_pages, c.categorie, 
                   u.nom, u.prenom, c.matricule_enseignant
                   FROM cours c
                   JOIN user_ u ON u.matricule = c.matricule_enseignant
@@ -47,7 +47,14 @@ class Etudiant extends User {
         
         $stmt->execute();
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch tags for each course
+        foreach ($courses as &$course) {
+            $course['tags'] = $this->getTagsForCourse($course['id']);
+        }
+
+        return $courses;
     }
 
     public function getTotalCourses($category = null, $searchTerm = '') {
@@ -122,7 +129,14 @@ class Etudiant extends User {
         $stmt->bindParam(':matricule_etudiant', $matricule_etudiant);
         $stmt->execute();
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch tags for each course
+        foreach ($courses as &$course) {
+            $course['tags'] = $this->getTagsForCourse($course['id']);
+        }
+
+        return $courses;
     }
 
     public function removeFromCart($titre_cours, $matricule_etudiant) {
@@ -134,6 +148,19 @@ class Etudiant extends User {
         $stmt->bindParam(':matricule_etudiant', $matricule_etudiant);
         
         return $stmt->execute();
+    }
+
+    public function getTagsForCourse($courseId) {
+        $query = "SELECT t.nom_tag
+                  FROM tags t
+                  JOIN tags_courses tc ON t.id = tc.id_tags
+                  WHERE tc.id_cours = :courseId";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':courseId', $courseId);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 }
 

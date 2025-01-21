@@ -79,7 +79,15 @@ $reservedCourses = $etudiant->getCart($matricule);
                                 <p><i class="fas fa-calendar-alt"></i> <?php echo htmlspecialchars($course['date_creation']); ?></p>
                                 <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p>
                                 <p><i class="fas fa-folder"></i> <?php echo htmlspecialchars($course['categorie']); ?></p>
-                                <p><i class="fas fa-tags"></i> <?php echo htmlspecialchars($course['tags']); ?></p>
+                                <p><i class="fas fa-tags"></i> 
+                                    <?php 
+                                    if (!empty($course['tags'])) {
+                                        echo implode(', ', array_map('htmlspecialchars', $course['tags']));
+                                    } else {
+                                        echo 'Aucun tag';
+                                    }
+                                    ?>
+                                </p>
                                 <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button>
                                 <?php if ($etudiant->isCoursReserved($course['titre'], $matricule)): ?>
                                     <button class="btn btn-disabled" disabled>Déjà réservé</button>
@@ -106,7 +114,15 @@ $reservedCourses = $etudiant->getCart($matricule);
                                 <h3><?php echo htmlspecialchars($course['titre_cours']); ?></h3>
                                 <p><i class="fas fa-user"></i> <?php echo htmlspecialchars($course['prenom'] . ' ' . $course['nom']); ?></p>
                                 <p><i class="fas fa-folder"></i> <?php echo isset($course['categorie']) ? htmlspecialchars($course['categorie']) : 'Non catégorisé'; ?></p>
-                                <p><i class="fas fa-tags"></i> <?php echo isset($course['tags']) ? htmlspecialchars($course['tags']) : 'Aucun tag'; ?></p>
+                                <p><i class="fas fa-tags"></i> 
+                                    <?php 
+                                    if (!empty($course['tags'])) {
+                                        echo implode(', ', array_map('htmlspecialchars', $course['tags']));
+                                    } else {
+                                        echo 'Aucun tag';
+                                    }
+                                    ?>
+                                </p>
                                 <button class="btn" onclick="showDetails(<?php echo htmlspecialchars(json_encode($course)); ?>)">Détails</button>
                                 <button class="btn" onclick="removeReservation('<?php echo $course['titre_cours']; ?>', '<?php echo $matricule; ?>')">Annuler la réservation</button>
                             </div>
@@ -154,7 +170,7 @@ $reservedCourses = $etudiant->getCart($matricule);
             $('#modalFormat').text('Format: ' + course.format);
             $('#modalPages').text(course.nombre_pages ? 'Nombre de pages: ' + course.nombre_pages : '');
             $('#modalCategory').text('Catégorie: ' + course.categorie);
-            $('#modalTags').text('Tags: ' + (course.tags || 'Aucun tag'));
+            $('#modalTags').text('Tags: ' + (course.tags && course.tags.length > 0 ? course.tags.join(', ') : 'Aucun tag'));
             $('#modalFileLink').attr('href', course.file_path);
             $('#courseModal').show();
         }
