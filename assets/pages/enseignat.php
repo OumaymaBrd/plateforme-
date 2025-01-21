@@ -11,10 +11,10 @@ ini_set('display_errors', 1);
 session_start();
 require_once '../../db/Database.php';
 require_once '../../models/user.php';
-require_once '../../models/Cours.php';
-require_once '../../models/CoursDocument.php';
-require_once '../../models/CoursVideo.php';
-require_once '../../models/Tags_courses.php';
+require_once '../../models/cours.php';
+require_once '../../models/document.php';
+require_once '../../models/coursvideos.php';
+require_once '../../models/tags_courses.php';
 
 // Vérification de l'authentification et des autorisations
 if (!isset($_SESSION['user_id']) || $_SESSION['user_post'] !== 'enseignant' || $_SESSION['user_status'] !== 'accepter') {
@@ -42,12 +42,12 @@ $enrolledStudentsCount = 0;
 $coursesCount = 0;
 
 try {
-    $courses = Cours::getCoursesForEnseignant($db, $matricule);
-    $categories = Cours::getCategories($db);
-    $tags = Cours::getTags($db);
-    $enrollments = Cours::getEnrolledCourses($db, $matricule);
-    $enrolledStudentsCount = Cours::getEnrolledStudentsCount($db, $matricule);
-    $coursesCount = Cours::getCoursesCount($db, $matricule);
+    $courses = CoursDocument::getCoursesForEnseignant($db, $matricule);
+    $categories = CoursDocument::getCategories($db);
+    $tags = CoursDocument::getTags($db);
+    $enrollments = CoursDocument::getEnrolledCourses($db, $matricule);
+    $enrolledStudentsCount = CoursDocument::getEnrolledStudentsCount($db, $matricule);
+    $coursesCount = CoursDocument::getCoursesCount($db, $matricule);
 } catch (PDOException $e) {
     error_log("Error fetching data: " . $e->getMessage());
     $message = "Une erreur s'est produite lors de la récupération des données. Veuillez réessayer plus tard.";
@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $tags_courses->addTagToCourse($newCours->getId(), $tagId);
                 }
                 $message = "Cours ajouté avec succès";
-                $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+                $courses = CoursDocument::getCoursesForEnseignant($db, $matricule); // Refresh the course list
             } else {
                 $message = "Erreur lors de l'ajout du cours";
             }
@@ -137,29 +137,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Traitement de la modification d'un cours
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_course') {
-    $format = $_POST['format'];
-    $editCours = ($format === 'pdf' || $format === 'txt') ? new CoursDocument($db) : new CoursVideo($db);
+    $editCours = new CoursDocument($db); // We'll determine the type later
 
     if (!$editCours->getCoursByTitre($_POST['titre'])) {
         $message = "Erreur : Cours non trouvé";
     } else {
-        $editCours->setDescription($_POST['description']);
-        $editCours->setFormat($format);
-        $editCours->setCategorie($_POST['categorie']);
-
-        if ($format === 'pdf' || $format === 'txt') {
-            $editCours->setNombrePages($_POST['nombre_pages']);
-            $allowedExtensions = ['pdf', 'txt'];
-        } else {
-            $editCours->setDureeMinutes($_POST['duree_minutes']);
-            $allowedExtensions = ['mp4'];
+        // Only set fields that are provided
+        if (!empty($_POST['description'])) {
+            $editCours->setDescription($_POST['description']);
+        }
+        if (!empty($_POST['format'])) {
+            $editCours->setFormat($_POST['format']);
+        }
+        if (!empty($_POST['categorie'])) {
+            $editCours->setCategorie($_POST['categorie']);
         }
 
-        // Gestion du fichier
+        // Handle file upload if a new file is provided
         if (isset($_FILES['file_upload']) && $_FILES['file_upload']['error'] === UPLOAD_ERR_OK) {
+            $format = $_POST['format'];
+            $allowedExtensions = ($format === 'pdf' || $format === 'txt') ? ['pdf', 'txt'] : ['mp4'];
             list($uploadSuccess, $uploadResult) = handleFileUpload($_FILES['file_upload'], $allowedExtensions);
             if ($uploadSuccess) {
-                // Supprimer l'ancien fichier si un nouveau est uploadé
+                // Delete the old file if it exists
                 if (file_exists($editCours->getFilePath())) {
                     unlink($editCours->getFilePath());
                 }
@@ -169,15 +169,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
 
+        // Set nombre_pages or duree_minutes based on the format
+        if ($_POST['format'] === 'pdf' || $_POST['format'] === 'txt') {
+            if (!empty($_POST['nombre_pages'])) {
+                $editCours->setNombrePages($_POST['nombre_pages']);
+            }
+        } else {
+            if (!empty($_POST['duree_minutes'])) {
+                $editCours->setDureeMinutes($_POST['duree_minutes']);
+            }
+        }
+
         if (empty($message)) {
             try {
                 if ($editCours->modifierCours()) {
+                    // Handle tags
                     $tags_courses->removeTagsFromCourse($editCours->getId());
-                    foreach ($_POST['tags'] as $tagId) {
-                        $tags_courses->addTagToCourse($editCours->getId(), $tagId);
+                    if (!empty($_POST['tags'])) {
+                        foreach ($_POST['tags'] as $tagId) {
+                            $tags_courses->addTagToCourse($editCours->getId(), $tagId);
+                        }
                     }
                     $message = "Cours modifié avec succès";
-                    $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+                    $courses = CoursDocument::getCoursesForEnseignant($db, $matricule); // Refresh the course list
                 } else {
                     $message = "Erreur lors de la modification du cours";
                 }
@@ -202,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         try {
             if ($deleteCours->supprimerCours()) {
                 $message = "Cours supprimé avec succès";
-                $courses = Cours::getCoursesForEnseignant($db, $matricule); // Refresh the course list
+                $courses = CoursDocument::getCoursesForEnseignant($db, $matricule); // Refresh the course list
             } else {
                 $message = "Erreur lors de la suppression du cours";
             }
@@ -227,9 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $titre_cours = $_POST['titre_cours'];
 
     try {
-        if (Cours::supprimerInscription($db, $matricule_etudiant, $titre_cours)) {
+        if (CoursDocument::supprimerInscription($db, $matricule_etudiant, $titre_cours)) {
             $message = "Inscription supprimée avec succès";
-            $enrollments = Cours::getEnrolledCourses($db, $matricule); // Refresh the enrollments list
+            $enrollments = CoursDocument::getEnrolledCourses($db, $matricule); // Refresh the enrollments list
         } else {
             $message = "Erreur lors de la suppression de l'inscription";
         }
@@ -428,11 +442,11 @@ function debug_to_console($data) {
                 <input type="hidden" id="edit_titre" name="titre">
                 <div class="form-group">
                     <label for="edit_description">Description:</label>
-                    <textarea id="edit_description" name="description" required></textarea>
+                    <textarea id="edit_description" name="description"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="edit_format">Format:</label>
-                    <select id="edit_format" name="format" required onchange="toggleEditFormatFields()">
+                    <select id="edit_format" name="format" onchange="toggleEditFormatFields()">
                         <option value="pdf">PDF</option>
                         <option value="txt">TXT</option>
                         <option value="mp4">MP4</option>
@@ -452,7 +466,7 @@ function debug_to_console($data) {
                 </div>
                 <div class="form-group">
                     <label for="edit_categorie">Catégorie:</label>
-                    <select id="edit_categorie" name="categorie" required>
+                    <select id="edit_categorie" name="categorie">
                         <?php foreach ($categories as $categorie): ?>
                             <option value="<?php echo isset($categorie) ? htmlspecialchars($categorie) : ''; ?>"><?php echo isset($categorie) ? htmlspecialchars($categorie) : ''; ?></option>
                         <?php endforeach; ?>
@@ -460,7 +474,7 @@ function debug_to_console($data) {
                 </div>
                 <div class="form-group">
                     <label for="edit_tags">Tags:</label>
-                    <select id="edit_tags" name="tags[]" multiple required>
+                    <select id="edit_tags" name="tags[]" multiple>
                         <?php foreach ($tags as $tag): ?>
                             <option value="<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['nom_tag']); ?></option>
                         <?php endforeach; ?>
@@ -567,7 +581,7 @@ function debug_to_console($data) {
             }
 
             // Update this part to handle tag IDs
-            var courseTags = course.tags ? course.tags.split(',') : [];
+            var courseTags = course.tags ? course.tags.split(',').map(tag => tag.trim()) : [];
             $('#edit_tags').val(courseTags);
             
             $('#editModal').show();

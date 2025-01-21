@@ -12,8 +12,7 @@ abstract class Cours {
     protected $matricule_enseignant;
     protected $file_path;
     protected $supprime;
-    protected $nombre_pages;
-    protected $duree_minutes;
+    protected $tags;
 
     public function __construct($db) {
         $this->conn = $db;
@@ -92,52 +91,52 @@ abstract class Cours {
         $this->supprime = $supprime;
     }
 
-    public function getNombrePages() {
-        return $this->nombre_pages;
+    public function getTags() {
+        return $this->tags;
     }
 
-    public function setNombrePages($nombre_pages) {
-        $this->nombre_pages = $nombre_pages;
-    }
-
-    public function getDureeMinutes() {
-        return $this->duree_minutes;
-    }
-
-    public function setDureeMinutes($duree_minutes) {
-        $this->duree_minutes = $duree_minutes;
+    public function setTags($tags) {
+        $this->tags = $tags;
     }
 
     abstract public function ajouterCours();
 
     public function modifierCours() {
-        $query = "UPDATE " . $this->table_name . "
-              SET description = :description, format = :format, 
-                  categorie = :categorie, file_path = :file_path";
-    
-        if (isset($this->nombre_pages)) {
-            $query .= ", nombre_pages = :nombre_pages";
-        } elseif (isset($this->duree_minutes)) {
-            $query .= ", duree_minutes = :duree_minutes";
+        $query = "UPDATE " . $this->table_name . " SET ";
+        $params = array();
+
+        if (!empty($this->description)) {
+            $query .= "description = :description, ";
+            $params[':description'] = $this->description;
         }
-    
+        if (!empty($this->format)) {
+            $query .= "format = :format, ";
+            $params[':format'] = $this->format;
+        }
+        if (!empty($this->categorie)) {
+            $query .= "categorie = :categorie, ";
+            $params[':categorie'] = $this->categorie;
+        }
+        if (!empty($this->tags)) {
+            $query .= "tags = :tags, ";
+            $params[':tags'] = $this->tags;
+        }
+        if (!empty($this->file_path)) {
+            $query .= "file_path = :file_path, ";
+            $params[':file_path'] = $this->file_path;
+        }
+
+        // Remove the trailing comma and space
+        $query = rtrim($query, ", ");
+
         $query .= " WHERE id = :id";
-
-        $stmt = $this->conn->prepare($query);
-
-        $stmt->bindParam(":id", $this->id);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":format", $this->format);
-        $stmt->bindParam(":categorie", $this->categorie);
-        $stmt->bindParam(":file_path", $this->file_path);
-
-        if (isset($this->nombre_pages)) {
-            $stmt->bindParam(":nombre_pages", $this->nombre_pages);
-        } elseif (isset($this->duree_minutes)) {
-            $stmt->bindParam(":duree_minutes", $this->duree_minutes);
-        }
+        $params[':id'] = $this->id;
 
         try {
+            $stmt = $this->conn->prepare($query);
+            foreach ($params as $key => &$val) {
+                $stmt->bindParam($key, $val);
+            }
             if($stmt->execute()) {
                 return true;
             }
@@ -146,103 +145,6 @@ abstract class Cours {
             throw $e;
         }
         return false;
-    }
-
-    public static function getCoursesForEnseignant($db, $matricule) {
-        $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags 
-                  FROM " . (new static($db))->table_name . " c
-                  LEFT JOIN tags_courses tc ON c.id = tc.id_cours
-                  LEFT JOIN tags t ON tc.id_tags = t.id
-                  WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
-                  GROUP BY c.id
-                  ORDER BY c.titre DESC";
-        try {
-            $stmt = $db->prepare($query);
-            $stmt->bindParam(':matricule', $matricule);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération des cours : " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    public static function getCategories($db) {
-        $query = "SELECT DISTINCT categorie FROM " . (new static($db))->table_name . " WHERE supprime = 0 ORDER BY categorie";
-        try {
-            $stmt = $db->prepare($query);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_COLUMN);
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération des catégories : " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    public static function getTags($db) {
-        $query = "SELECT id, nom_tag FROM tags ORDER BY nom_tag";
-        try {
-            $stmt = $db->prepare($query);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération des tags : " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    public static function getEnrolledCourses($db, $matricule_enseignant) {
-        $query = "SELECT u.nom, u.prenom, ic.titre_cours, u.matricule as matricule_etudiant
-                  FROM inscris_cours ic
-                  JOIN " . (new static($db))->table_name . " c ON ic.titre_cours = c.titre
-                  JOIN user_ u ON ic.matricule_etudiant = u.matricule
-                  WHERE c.matricule_enseignant = :matricule_enseignant AND c.supprime = 0
-                  ORDER BY c.titre, u.nom, u.prenom";
-        
-        try {
-            $stmt = $db->prepare($query);
-            $stmt->bindParam(':matricule_enseignant', $matricule_enseignant);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération des inscriptions : " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    public static function getEnrolledStudentsCount($db, $matricule_enseignant) {
-        $query = "SELECT COUNT(DISTINCT ic.matricule_etudiant) as count
-                  FROM inscris_cours ic
-                  JOIN " . (new static($db))->table_name . " c ON ic.titre_cours = c.titre
-                  WHERE c.matricule_enseignant = :matricule_enseignant AND c.supprime = 0";
-        
-        try {
-            $stmt = $db->prepare($query);
-            $stmt->bindParam(':matricule_enseignant', $matricule_enseignant);
-            $stmt->execute();
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $result['count'];
-        } catch (PDOException $e) {
-            error_log("Erreur lors du comptage des étudiants inscrits : " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    public static function getCoursesCount($db, $matricule_enseignant) {
-        $query = "SELECT COUNT(*) as count
-                  FROM " . (new static($db))->table_name . "
-                  WHERE matricule_enseignant = :matricule_enseignant AND supprime = 0";
-        
-        try {
-            $stmt = $db->prepare($query);
-            $stmt->bindParam(':matricule_enseignant', $matricule_enseignant);
-            $stmt->execute();
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $result['count'];
-        } catch (PDOException $e) {
-            error_log("Erreur lors du comptage des cours : " . $e->getMessage());
-            throw $e;
-        }
     }
 
     public function supprimerCours() {
@@ -276,8 +178,7 @@ abstract class Cours {
                 $this->setMatriculeEnseignant($row['matricule_enseignant']);
                 $this->setFilePath($row['file_path']);
                 $this->setSupprime($row['supprime']);
-                $this->setNombrePages($row['nombre_pages'] ?? null);
-                $this->setDureeMinutes($row['duree_minutes'] ?? null);
+                $this->setTags($row['tags']);
                 return true;
             }
         } catch (PDOException $e) {
@@ -288,38 +189,51 @@ abstract class Cours {
         return false;
     }
 
-    protected function sanitizeInput($input) {
-        return htmlspecialchars(strip_tags($input));
-    }
-
-    public static function supprimerInscription($db, $matricule_etudiant, $titre_cours) {
-        $query = "DELETE FROM inscris_cours 
-                  WHERE matricule_etudiant = :matricule_etudiant 
-                  AND titre_cours = :titre_cours";
-        
+    public static function getCoursesForEnseignant($db, $matricule) {
+        $query = "SELECT c.*, GROUP_CONCAT(t.nom_tag) as tags 
+                  FROM cours c
+                  LEFT JOIN tags_courses tc ON c.id = tc.id_cours
+                  LEFT JOIN tags t ON tc.id_tags = t.id
+                  WHERE c.matricule_enseignant = :matricule AND c.supprime = 0 
+                  GROUP BY c.id
+                  ORDER BY c.titre DESC";
         try {
             $stmt = $db->prepare($query);
-            $stmt->bindParam(':matricule_etudiant', $matricule_etudiant);
-            $stmt->bindParam(':titre_cours', $titre_cours);
-            return $stmt->execute();
+            $stmt->bindParam(':matricule', $matricule);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Erreur lors de la suppression de l'inscription : " . $e->getMessage());
+            error_log("Erreur lors de la récupération des cours : " . $e->getMessage());
             throw $e;
         }
     }
 
-    public function getDebugInfo() {
-        return [
-            'id' => $this->id,
-            'titre' => $this->titre,
-            'description' => $this->description,
-            'type' => $this->type,
-            'format' => $this->format,
-            'categorie' => $this->categorie,
-            'file_path' => $this->file_path,
-            'nombre_pages' => $this->nombre_pages ?? null,
-            'duree_minutes' => $this->duree_minutes ?? null,
-        ];
+    public static function getCategories($db) {
+        $query = "SELECT DISTINCT categorie FROM cours WHERE supprime = 0 ORDER BY categorie";
+        try {
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la récupération des catégories : " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public static function getTags($db) {
+        $query = "SELECT id, nom_tag FROM tags ORDER BY nom_tag";
+        try {
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la récupération des tags : " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    protected function sanitizeInput($input) {
+        return htmlspecialchars(strip_tags($input));
     }
 }
 
