@@ -31,8 +31,7 @@ $user = new User($db);
 $user->id = $_SESSION['user_id'];
 $user->matricule = $_SESSION['user_matricule'];
 
-// Instead of instantiating Cours directly, we'll use it for static method calls
-$coursHelper = new CoursDocument($db); // Using CoursDocument as a helper, but we could use CoursVideo too
+$coursHelper = new CoursDocument($db); 
 $tags_courses = new Tags_courses($db);
 
 $courses = $coursHelper->getCoursesForEnseignant($matricule);
@@ -40,7 +39,7 @@ $courses = $coursHelper->getCoursesForEnseignant($matricule);
 $categories = $coursHelper->getCategories();
 $tags = $coursHelper->getTags();
 
-// Convert categories and tags to JSON for use in JavaScript
+//convertie categorie et tags en json pour js 
 $categoriesJson = json_encode($categories);
 $tagsJson = json_encode($tags);
 

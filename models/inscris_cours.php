@@ -12,7 +12,7 @@ class InscrisCours {
         $this->dateInscription = date('Y-m-d H:i:s');
     }
 
-    // Getters
+  
     public function getId() { return $this->id; }
     public function getEtudiantId() { return $this->etudiantId; }
     public function getCoursId() { return $this->coursId; }

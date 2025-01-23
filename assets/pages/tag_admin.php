@@ -17,14 +17,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nom_tags = $_POST['nom_tag'];
 
     if ($id) {
-        // Editing a single tag
+ 
         if ($admin->modifierTag($id, $nom_tags)) {
             echo json_encode(['success' => true, 'message' => 'Tag modifié avec succès']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Erreur lors de la modification du tag']);
         }
     } else {
-        // Adding one or multiple tags
+    
         $tags = array_map('trim', explode(',', $nom_tags));
         $success = true;
         $added_count = 0;
